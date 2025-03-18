@@ -62,6 +62,7 @@ import { loader as alladminLoader } from "./pages/AllAdmin";
 import { action as deleteAdminAction } from "./pages/DeleteAdmin";
 import { loader as allNotificationLoader } from "./pages/AllNotification";
 import { loader as editNotificationLoader, action as editNotificationAction } from "./pages/AddNotification";
+import AuthHandler from "./pages/AuthHandler";
 
 export const checkDefaultTheme = () => {
   const isDarkTheme = localStorage.getItem("darkTheme") === "true";
@@ -90,6 +91,10 @@ const router = createBrowserRouter([
         path: "/login",
         element: <Login />,
         action: loginAction,
+      },
+      {
+        path: "/auth", 
+        element: <AuthHandler />,
       },
       {
         path: "/dashboard",

@@ -68,3 +68,27 @@ export const logout = (req, res) => {
   });
   res.status(StatusCodes.OK).json({ msg: "ออกจากระบบสำเร็จ" });
 };
+
+export const autoLogin = async (req, res) => {
+  const { username, passwordFromFrontend } = req.body;
+
+  const user = await User.findOne({ username });
+
+  if (!user) {
+    return res.status(401).json({ error: "User not found" });
+  }
+
+  if (passwordFromFrontend === user.password) {
+    const token = createJWT({ userId: user._id });
+
+    res.cookie("token", token, {
+      httpOnly: true,
+      expires: new Date(Date.now() + 1000 * 60 * 60 * 24),  // token หมดอายุหลังจาก 1 วัน
+      secure: process.env.NODE_ENV === "production",  // ใช้ secure cookie ถ้าอยู่ในโหมด production
+    });
+
+    res.status(StatusCodes.OK).json({ msg: "เข้าสู่ระบบสำเร็จ" });
+  } else {
+    return res.status(401).json({ error: "Invalid credentials" });
+  }
+};
