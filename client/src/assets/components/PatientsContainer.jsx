@@ -33,7 +33,7 @@ const PatientsContainer = () => {
       <table>
         <thead>
           <tr>
-            <th className="nopat">หมายเลขผู้ป่วย</th>
+            <th className="nopat">เลขประจำตัวประชาชน</th>
             <th>ชื่อผู้ป่วย</th>
             <th>สถานะของผู้ป่วย</th>
             <th className="mang">จัดการ</th>

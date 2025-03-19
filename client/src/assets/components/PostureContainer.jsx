@@ -69,7 +69,7 @@ const PostureContainer = () => {
             <th>ชื่อภารกิจ</th>
             <th>การประเมิน</th>
             <th>จำนวนท่า</th>
-            <th className="actions-header">จัดการ</th>
+            <th>จัดการ</th>
           </tr>
         </thead>
         <tbody>

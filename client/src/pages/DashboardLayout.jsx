@@ -24,7 +24,7 @@ const DashboardLayout = ({ isDarkThemeEnabled }) => {
   const data = useLoaderData();
   console.log(data);
   // temp
-  const user = { name: "Manipha" };
+  const user = { name: "somjet" };
   const [showSidebar, setShowSidebar] = useState(false);
   const [isDarkTheme, setIsDarkTheme] = useState(checkDefaultTheme());
 

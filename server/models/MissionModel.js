@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { TYPEPOSTURES } from "../utils/constants.js";
 
 const MissionSchema = new mongoose.Schema(
   {
@@ -11,6 +12,11 @@ const MissionSchema = new mongoose.Schema(
         ref: "submissions",
       },
     ],
+    missionType: {
+          type: String,
+          enum: Object.values(TYPEPOSTURES),
+          default: TYPEPOSTURES.TYPE_1,
+        },
     isEvaluate: { type: Boolean, default: false },
     isDeleted: { type: Boolean, default: false },
   },

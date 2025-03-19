@@ -2,6 +2,9 @@ import Patient from "../models/PatientModel.js";
 import { StatusCodes } from "http-status-codes";
 import mongoose from "mongoose";
 import day from "dayjs";
+import {
+  TYPESTATUS
+} from "../../server/utils/constants.js";
 
 export const getAllPatients = async (req, res) => {
   const { search, userStatus, userType, sort, isDeleted } = req.query;
@@ -114,27 +117,44 @@ export const getPatient = async (req, res) => {
 };
 
 export const updatePatient = async (req, res) => {
-  const updatedPatients = await Patient.findByIdAndUpdate(
-    req.params._id,
-    req.body,
-    {
-      new: true,
+  try {
+    console.log("📌 Update Request Params ID:", req.params._id);
+    console.log("📌 Update Request Body:", req.body);
+
+    let updateData = { ...req.body };
+
+    // ✅ ตรวจสอบว่า TYPESTATUS ถูกใช้ได้ถูกต้อง
+    if (!TYPESTATUS) {
+      throw new Error("❌ TYPESTATUS is not defined");
     }
-  );
 
-  if (!updatedPatients)
-    throw new NotFoundError(`no patient with id : ${req.params._id}`);
+    // แปลง physicalTherapy ให้เป็น Boolean ถ้ามีการส่งค่ามา
+    if (typeof updateData.physicalTherapy === "string") {
+      updateData.physicalTherapy = updateData.physicalTherapy === "true";
+    }
 
-  res.status(StatusCodes.OK).json({ patient: updatedPatients });
+    // ตรวจสอบถ้า userStatus เป็น "จบการรักษา" ให้ตั้ง physicalTherapy เป็น false
+    if (updateData.userStatus === TYPESTATUS.TYPE_ST2) {
+      updateData.physicalTherapy = false;
+    }
+
+    const updatedPatient = await Patient.findByIdAndUpdate(
+      req.params._id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedPatient) {
+      return res.status(404).json({ error: `ไม่พบผู้ป่วย ID: ${req.params._id}` });
+    }
+
+    res.status(200).json({ patient: updatedPatient });
+  } catch (error) {
+    console.error("❌ Backend Error:", error);
+    res.status(500).json({ error: error.message || "เกิดข้อผิดพลาดในการอัปเดตข้อมูล" });
+  }
 };
 
-// export const deletePatient = async (req, res) => {
-//   const removedPatient = await Patient.findByIdAndDelete(req.params._id);
-
-//   if (!removedPatient)
-//     throw new NotFoundError(`no patient with id : ${username}`);
-//   res.status(StatusCodes.OK).json({ patient: removedPatient });
-// };
 
 export const deletePatient = async (req, res) => {
   const { _id } = req.params;
@@ -209,36 +229,36 @@ export const showStats = async (req, res) => {
     })
     .reverse();
 
-      let monthlyApplications2 = await Patient.aggregate([
-        { $match: { createdAt: { $exists: true } } },
-        {
-          $group: {
-            _id: {
-              year: { $year: "$createdAt" },
-              month: { $month: "$createdAt" },
-            },
-            count: { $sum: 1 },
-          },
+  let monthlyApplications2 = await Patient.aggregate([
+    { $match: { createdAt: { $exists: true } } },
+    {
+      $group: {
+        _id: {
+          year: { $year: "$createdAt" },
+          month: { $month: "$createdAt" },
         },
-        { $sort: { "_id.year": -1, "_id.month": -1 } },
-        { $limit: 6 },
-      ]);
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { "_id.year": -1, "_id.month": -1 } },
+    { $limit: 6 },
+  ]);
 
-      monthlyApplications2 = monthlyApplications2
-        .map((item) => {
-          const {
-            _id: { year, month },
-            count,
-          } = item;
+  monthlyApplications2 = monthlyApplications2
+    .map((item) => {
+      const {
+        _id: { year, month },
+        count,
+      } = item;
 
-          const date = day()
-            .month(month - 1)
-            .year(year)
-            .format("MMM YYYY");
+      const date = day()
+        .month(month - 1)
+        .year(year)
+        .format("MMM YYYY");
 
-          return { date, count };
-        })
-        .reverse();
+      return { date, count };
+    })
+    .reverse();
 
   res.status(StatusCodes.OK).json({ defaultStats, monthlyApplications, monthlyApplications2 });
 };

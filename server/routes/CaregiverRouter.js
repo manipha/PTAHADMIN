@@ -4,17 +4,18 @@ import {
   getCaregiverById,
   createCaregiver,
   updateCaregiver,
-  deleteCaregiver
+  deleteCaregiver,
 } from "../controllers/CaregiverController.js";
 
 const router = express.Router();
 
-// เส้นทางสำหรับการดึงข้อมูลผู้ดูแลทั้งหมดและการสร้างข้อมูลใหม่
+// เส้นทางสำหรับดึงข้อมูลผู้ดูแลทั้งหมดและการสร้างผู้ดูแลใหม่
 router.route("/")
   .get(getAllCaregivers)
   .post(createCaregiver);
 
-// เส้นทางสำหรับการดึง, อัปเดต และลบข้อมูลผู้ดูแลตาม id
+// เส้นทางสำหรับดึงข้อมูลผู้ดูแล (ค้นจาก ID_card_number),
+// อัปเดต และลบผู้ดูแลโดยใช้ _id ของ caregiver จาก URL
 router.route("/:id")
   .get(getCaregiverById)
   .patch(updateCaregiver)

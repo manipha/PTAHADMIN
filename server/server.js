@@ -37,7 +37,7 @@ app.use(cookieParser());
 
 // ✅ เปิด CORS ให้เชื่อมต่อจาก Frontend
 app.use(cors({
-  origin: '*', 
+  origin: '*',
   methods: ["GET", "POST"]
 }));
 
@@ -51,7 +51,7 @@ const server = http.createServer(app);
 // ✅ กำหนดค่า Socket.IO
 const io = new Server(server, {
   cors: {
-    origin: '*', 
+    origin: '*',
     methods: ["GET", "POST"]
   }
 });
@@ -88,7 +88,7 @@ app.use("/api/v1/posts", authenticateUser, PostRouter);
 app.use("/api/v1/files", authenticateUser, FileRouter);
 app.use("/api/v1/notifications", authenticateUser, NotificationRouter);
 app.use("/api/v1/missions", authenticateUser, missionRoutes);
-app.use("/api/v1/caregiver",authenticateUser, CaregiverRouter);
+app.use("/api/v1/caregiver", authenticateUser, CaregiverRouter);
 
 // ไม่พบข้อมูล
 app.use("*", (req, res) => res.status(404).json({ msg: "Not Found" }));
@@ -108,6 +108,18 @@ try {
   cron.schedule("* * * * *", () => {
     console.log("✅ Checking notifications...");
   });
+
+  // //ลบข้อมูล user ที่เกิน 30 วัน ทุก เที่ยงคืน
+  // cron.schedule("0 0 * * *", async () => {
+  //   try {
+  //     console.log("Running cron job to delete expired users...");
+  //     const now = new Date();
+  //     const result = await User.deleteMany({ deleteExpiry: { $lte: now } }); // ลบข้อมูลที่หมดอายุ
+  //     console.log(`Deleted ${result.deletedCount} expired users.`);
+  //   } catch (error) {
+  //     console.error("Error in cron job:", error);
+  //   }
+  // });
 
 } catch (error) {
   console.error("🔥 Error starting server:", error);

@@ -13,7 +13,7 @@ export { default as ChartsContainer } from "./ChartsContainer";
 export { default as StatsContainer } from "./StatsContainer";
 export { default as PostureContainer } from "./PostureContainer";
 export { default as SubmitBtn } from "./SubmitBtn";
-export { default as SearchPostures } from "./SearchPostures";
+export { default as SearchMissions } from "./SearchMissions";
 export { default as SearchMPersonnel } from "./SearchMPersonnel";
 export { default as SearchAdmin } from "./SearchAdmin";
 export { default as DeletePosture } from "./DeletePosture";

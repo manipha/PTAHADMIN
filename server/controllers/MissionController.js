@@ -2,15 +2,59 @@ import { StatusCodes } from "http-status-codes";
 import Mission from "../models/MissionModel.js";
 import { NotFoundError } from "../errors/customError.js";
 import Submission from "../models/SubmissionModel.js";
-import MissionModel from "../models/MissionModel.js";
 
 export const getAllMissions = async (req, res) => {
-  const missions = await Mission.find({ isDeleted: { $ne: true } })
+  const { search, sort, page, limit, missionType } = req.query;
+
+  // สร้าง queryObject โดยเริ่มต้นที่ isDeleted !== true
+  const queryObject = { isDeleted: { $ne: true } };
+
+  // ถ้ามี search parameter ให้ค้นหาจาก no หรือ name
+  if (search) {
+    queryObject.$or = [
+      { no: { $regex: search, $options: "i" } },
+      { name: { $regex: search, $options: "i" } },
+    ];
+  }
+
+  if (missionType && missionType !== "ทั้งหมด") {
+    queryObject.missionType = missionType;
+  }
+
+  // กำหนดตัวเลือกสำหรับการ sort
+  const sortOptions = {
+    ใหม่ที่สุด: "-createdAt",
+    เก่าที่สุด: "createdAt",
+    "เรียงจาก ก-ฮ": "-title",
+    "เรียงจาก ฮ-ก": "title",
+  };
+
+  const sortKey = sortOptions[sort] || sortOptions.ใหม่ที่สุด;
+
+  // กำหนด pagination
+  const pageNum = Number(page) || 1;
+  const limitNum = Number(limit) || 30;
+  const skip = (pageNum - 1) * limitNum;
+
+  // ดึง missions ตาม queryObject ที่สร้างไว้ พร้อมกับ populate ฟิลด์ submission
+  const missions = await Mission.find(queryObject)
+    .sort(sortKey)
+    .skip(skip)
+    .limit(limitNum)
     .populate({
-      path: 'submission',
-      model: 'submissions'
+      path: "submission",
+      model: "submissions",
     });
-  res.status(StatusCodes.OK).json({ missions });
+
+  const totalMissions = await Mission.countDocuments(queryObject);
+  const numOfPages = Math.ceil(totalMissions / limitNum);
+
+  res.status(StatusCodes.OK).json({
+    totalMissions,
+    numOfPages,
+    currentPage: pageNum,
+    missions,
+  });
 };
 
 export const createMission = async (req, res) => {

@@ -1,63 +1,141 @@
 import Caregiver from "../models/Caregiver.js";
 
-// ดึงข้อมูลผู้ดูแลทั้งหมด พร้อม populate ข้อมูลผู้ใช้งานและคนไข้
+// ดึงข้อมูลผู้ดูแลทั้งหมด (มี populate ข้อมูลผู้ใช้งานและคนไข้)
 export const getAllCaregivers = async (req, res) => {
   try {
-    const caregivers = await Caregiver.find().populate("user patient");
+    const caregivers = await Caregiver.find().populate("userRelationships.user");
     res.status(200).json({ caregivers });
   } catch (error) {
     res.status(500).json({ msg: error.message });
   }
 };
 
-// ดึงข้อมูลผู้ดูแลตาม id พร้อม populate ข้อมูลที่เกี่ยวข้อง
+// ดึงข้อมูลผู้ดูแลตาม ID_card_number (ใน URL จะส่งเป็น :id)
 export const getCaregiverById = async (req, res) => {
+  const { id } = req.params;
   try {
-    const { id } = req.params;
-    const caregiver = await Caregiver.findById(id).populate("user patient");
-    if (!caregiver) {
-      return res.status(404).json({ msg: "ไม่พบข้อมูลผู้ดูแล" });
+    // ค้นหาผู้ดูแลโดยใช้ ID_card_number แทน _id ของ MongoDB
+    const caregiver = await Caregiver.findOne({ ID_card_number: id }).populate("userRelationships.user");
+    if (caregiver) {
+      return res.status(200).json({ status: "Ok", caregiver });
+    } else {
+      return res.status(404).json({ status: "Not Found", message: "ไม่พบข้อมูลผู้ดูแล" });
     }
-    res.status(200).json({ caregiver });
   } catch (error) {
-    res.status(500).json({ msg: error.message });
+    console.error(error);
+    return res.status(500).json({ status: "Error", message: "เกิดข้อผิดพลาดในเซิร์ฟเวอร์" });
   }
 };
 
-// สร้างข้อมูลผู้ดูแลใหม่
+// สร้างผู้ดูแลใหม่หรือเพิ่ม user relationship ให้กับ caregiver ที่มีอยู่แล้ว
 export const createCaregiver = async (req, res) => {
+  const { user, name, surname, tel, Relationship, ID_card_number } = req.body;
+
+  if (!user || !name || !surname) {
+    return res.status(400).json({ error: "ชื่อ และนามสกุล ไม่ควรเป็นค่าว่าง" });
+  }
+
   try {
-    const newCaregiver = await Caregiver.create(req.body);
-    res.status(201).json({ newCaregiver });
+    const existingCaregiver = await Caregiver.findOne({ ID_card_number });
+    if (existingCaregiver) {
+      // ตรวจสอบว่าผู้ใช้คนนี้มีอยู่แล้วหรือไม่
+      const userExists = existingCaregiver.userRelationships.find(
+        (rel) => rel.user.toString() === user.toString()
+      );
+
+      if (!userExists) {
+        existingCaregiver.userRelationships.push({ user, relationship: Relationship });
+        await existingCaregiver.save();
+        return res.status(200).json({
+          status: "Ok",
+          message: "User added to existing caregiver with relationship",
+          existingCaregiver,
+        });
+      } else {
+        return res.status(400).json({ error: "ผู้ป่วยมีผู้ดูแลคนนี้แล้ว" });
+      }
+    }
+
+    // สร้าง Caregiver ใหม่ถ้ายังไม่มี
+    const newCaregiver = await Caregiver.create({
+      ID_card_number,
+      name,
+      surname,
+      tel,
+      userRelationships: [{ user, relationship: Relationship }],
+    });
+
+    return res.status(201).json({
+      status: "Ok",
+      message: "Caregiver added successfully",
+      newCaregiver,
+    });
   } catch (error) {
-    res.status(500).json({ msg: error.message });
+    console.error("Error adding caregiver:", error);
+    return res.status(500).json({ error: "Error adding caregiver" });
   }
 };
 
-// อัปเดตข้อมูลผู้ดูแล
+// อัปเดตข้อมูลผู้ดูแลสำหรับผู้ใช้ที่ระบุ (ใช้ caregiver _id จาก URL)
 export const updateCaregiver = async (req, res) => {
+  const { user, name, surname, tel, Relationship } = req.body;
+  const caregiverId = req.params.id;
+  if (!user) {
+    return res.status(400).json({ error: "User is required" });
+  }
+
   try {
-    const { id } = req.params;
-    const updatedCaregiver = await Caregiver.findByIdAndUpdate(id, req.body, { new: true });
-    if (!updatedCaregiver) {
-      return res.status(404).json({ msg: "ไม่พบข้อมูลผู้ดูแลที่ต้องการแก้ไข" });
+    const result = await Caregiver.updateOne(
+      { _id: caregiverId, "userRelationships.user": user },
+      {
+        $set: {
+          name,
+          surname,
+          tel,
+          "userRelationships.$.relationship": Relationship,
+        },
+      }
+    );
+    if (result.modifiedCount === 0) {
+      return res.status(404).json({ error: "No caregiver updated. Check caregiver ID and user." });
     }
-    res.status(200).json({ updatedCaregiver });
+    return res.status(200).json({ status: "Ok", data: "Updated" });
   } catch (error) {
-    res.status(500).json({ msg: error.message });
+    console.error("Error updating user:", error);
+    return res.status(500).json({ error: "Error updating user" });
   }
 };
 
-// ลบข้อมูลผู้ดูแล
+// ลบผู้ดูแลหรือเอา user ออกจาก caregiver (ใช้ caregiver _id จาก URL และรับ userId ใน req.body)
 export const deleteCaregiver = async (req, res) => {
+  const caregiverId = req.params.id;
+  const { userId } = req.body;
+  if (!caregiverId || !userId) {
+    return res.status(400).json({ error: "Caregiver ID and User ID are required" });
+  }
+
   try {
-    const { id } = req.params;
-    const deletedCaregiver = await Caregiver.findByIdAndDelete(id);
-    if (!deletedCaregiver) {
-      return res.status(404).json({ msg: "ไม่พบข้อมูลผู้ดูแลที่ต้องการลบ" });
+    const caregiver = await Caregiver.findById(caregiverId);
+    if (!caregiver) {
+      return res.status(404).json({ error: "Caregiver not found" });
     }
-    res.status(200).json({ msg: "ลบข้อมูลผู้ดูแลเรียบร้อยแล้ว" });
+
+    // กรอง userRelationships เพื่อลบ userId ที่ระบุออก
+    caregiver.userRelationships = caregiver.userRelationships.filter(
+      (rel) => rel.user.toString() !== userId.toString()
+    );
+
+    // ถ้าไม่มี userRelationships เหลือ ให้ลบ caregiver ทิ้งไป
+    if (caregiver.userRelationships.length === 0) {
+      await Caregiver.findByIdAndDelete(caregiverId);
+      return res.status(200).json({ status: "Ok", message: "Caregiver deleted successfully" });
+    }
+
+    // ถ้ายังมี relationship อยู่ ให้บันทึกข้อมูลที่อัปเดต
+    await caregiver.save();
+    return res.status(200).json({ status: "Ok", message: "User removed from caregiver" });
   } catch (error) {
-    res.status(500).json({ msg: error.message });
+    console.error("Error deleting caregiver:", error);
+    return res.status(500).json({ error: "Error deleting caregiver" });
   }
 };
