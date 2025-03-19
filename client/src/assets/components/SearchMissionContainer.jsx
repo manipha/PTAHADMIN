@@ -25,7 +25,6 @@ const SearchMissionContainer = () => {
   return (
     <Wrapper>
       <Form className="form">
-        <h4 className="form-title">ค้นหาและกรองข้อมูล</h4>
         <div className="form-center">
           <FormRow
             labelText="ค้นหา"
