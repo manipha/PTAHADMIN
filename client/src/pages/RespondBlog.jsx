@@ -6,9 +6,15 @@ import { io } from "socket.io-client";
 import { FaTrash } from "react-icons/fa";
 
 // ✅ เชื่อมต่อ WebSocket ไปที่ Backend
-const socket = io("http://localhost:5100", { 
-  transports: ["websocket", "polling"],
-  reconnection: true
+// const socket = io("http://localhost:5100", { 
+//   transports: ["websocket", "polling"],
+//   reconnection: true
+// });
+
+// แก้ไข URL socket ตามจริง
+const socket = io(process.env.VITE_REACT_APP_SOCKET_URL, {
+  path: process.env.VITE_REACT_APP_SOCKET_PATH,
+  transports: ["websocket", "polling"]
 });
 
 const RespondBlog = () => {
