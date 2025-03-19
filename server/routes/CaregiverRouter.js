@@ -2,6 +2,7 @@ import express from "express";
 import {
   getAllCaregivers,
   getCaregiverById,
+  getCaregiverByPatientId,
   createCaregiver,
   updateCaregiver,
   deleteCaregiver,
@@ -13,6 +14,10 @@ const router = express.Router();
 router.route("/")
   .get(getAllCaregivers)
   .post(createCaregiver);
+
+// เส้นทางสำหรับดึงข้อมูลผู้ดูแลตาม patient ID
+router.route("/patient/:id")
+  .get(getCaregiverByPatientId);
 
 // เส้นทางสำหรับดึงข้อมูลผู้ดูแล (ค้นจาก ID_card_number),
 // อัปเดต และลบผู้ดูแลโดยใช้ _id ของ caregiver จาก URL

@@ -6,27 +6,14 @@ import { Link } from "react-router-dom";
 import { IoMdAddCircle } from "react-icons/io";
 import customFetch from "../../utils/customFetch";
 import { toast } from "react-toastify";
+import { useAllPostureContext } from "../../pages/AllPosture";
 
 const PostureContainer = () => {
-  const [missions, setMissions] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchMissions = async () => {
-    try {
-      setLoading(true);
-      const { data } = await customFetch.get("/missions");
-      setMissions(data.missions || []);
-    } catch (error) {
-      console.error("Error fetching missions:", error);
-      toast.error("เกิดข้อผิดพลาดในการโหลดข้อมูล");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchMissions();
-  }, []);
+  const { data } = useAllPostureContext();
+  const [loading, setLoading] = useState(false);
+  
+  // ข้อมูลจะมาจาก context แทนที่จะทำ API call ซ้ำ
+  const missions = data?.missions || [];
 
   const handleDeleteMission = async (missionId) => {
     if (!window.confirm("คุณแน่ใจหรือไม่ว่าต้องการลบภารกิจนี้?")) {
@@ -34,13 +21,17 @@ const PostureContainer = () => {
     }
 
     try {
+      setLoading(true);
       await customFetch.delete(`/missions/${missionId}`);
       toast.success("ลบภารกิจสำเร็จ");
-
-      fetchMissions();
+      
+      // แนะนำให้ reload หน้าแทนที่จะเรียก API เอง
+      window.location.reload();
     } catch (error) {
       console.error("Error deleting mission:", error);
       toast.error(error?.response?.data?.msg || "เกิดข้อผิดพลาดในการลบ");
+    } finally {
+      setLoading(false);
     }
   };
 

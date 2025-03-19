@@ -7,22 +7,13 @@ import {
   POSTURES_SORT_BY,
 } from "../../utils/constants";
 import { useAllPatientContext } from "../../pages/AllPatient";
+import { debounce } from "../../utils/debounce";
 
 const SearchContainer = () => {
   const { searchValues } = useAllPatientContext();
-  const { search, userStatus, sort } = searchValues;
+  const { search = "", userStatus = "", sort = "" } = searchValues || {};
   const submit = useSubmit();
 
-  const debounce = (onChange) => {
-    let timeout;
-    return (e) => {
-      const form = e.currentTarget.form;
-      clearTimeout(timeout);
-      timeout = setTimeout(() => {
-        onChange(form);
-      }, 2000);
-    };
-  };
   return (
     <Wrapper>
       <Form className="form">

@@ -32,7 +32,7 @@ export const loader = async ({ request }) => {
 const AllDoctorContext = createContext();
 
 const AllDoctor = () => {
-  const { data } = useLoaderData();
+  const { data, searchValues } = useLoaderData();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -47,7 +47,7 @@ const AllDoctor = () => {
   }, [data]);
 
   return (
-    <AllDoctorContext.Provider value={{ data }}>
+    <AllDoctorContext.Provider value={{ data, searchValues }}>
       <SearchMPersonnel />
       {/* <AddButton onClick={() => navigate("/dashboard/add-doctor")}>
         <b>+</b> เพิ่มข้อมูลแพทย์

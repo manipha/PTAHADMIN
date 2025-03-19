@@ -32,7 +32,7 @@ export const loader = async ({ request }) => {
 const AllAdminContext = createContext();
 
 const AllAdmin = () => {
-  const { data } = useLoaderData();
+  const { data, searchValues } = useLoaderData();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -47,7 +47,7 @@ const AllAdmin = () => {
   }, [data]);
 
   return (
-    <AllAdminContext.Provider value={{ data }}>
+    <AllAdminContext.Provider value={{ data, searchValues }}>
       <SearchAdmin />
       <AddButton onClick={() => navigate("/dashboard/add-admin")}>
         <b>+</b> เพิ่มแอดมิน

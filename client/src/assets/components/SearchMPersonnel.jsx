@@ -6,6 +6,7 @@ import {
   POSTURES_SORT_BY,
 } from "../../utils/constants";
 import { useAllDoctorContext } from "../../pages/AllDoctor";
+import { debounce } from "../../utils/debounce";
 
 const SearchMPersonnel = () => {
   const { searchValues } = useAllDoctorContext();
@@ -13,16 +14,6 @@ const SearchMPersonnel = () => {
   const { search = "", nametitle = "", sort = "" } = searchValues || {};
   const submit = useSubmit();
 
-  const debounce = (onChange) => {
-    let timeout;
-    return (e) => {
-      const form = e.currentTarget.form;
-      clearTimeout(timeout);
-      timeout = setTimeout(() => {
-        onChange(form);
-      }, 2000);
-    };
-  };
   return (
     <Wrapper>
       <Form className="form">

@@ -5,6 +5,7 @@ import {
   POSTURES_SORT_BY,
 } from "../../utils/constants";
 import { useAllAdminContext } from "../../pages/AllAdmin";
+import { debounce } from "../../utils/debounce";
 
 const SearchAdmin = () => {
   const { searchValues } = useAllAdminContext();
@@ -12,16 +13,6 @@ const SearchAdmin = () => {
   const { search = "", sort = "" } = searchValues || {};
   const submit = useSubmit();
 
-  const debounce = (onChange) => {
-    let timeout;
-    return (e) => {
-      const form = e.currentTarget.form;
-      clearTimeout(timeout);
-      timeout = setTimeout(() => {
-        onChange(form);
-      }, 2000);
-    };
-  };
   return (
     <Wrapper>
       <Form className="form">

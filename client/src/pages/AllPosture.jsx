@@ -7,40 +7,58 @@ import AllHeader from "../assets/components/AllHeader.jsx";
 import { useLoaderData, useNavigate } from "react-router-dom";
 import { MdOutlineAutoDelete } from "react-icons/md";
 import SoftDelete from "../assets/components/SoftDelete.jsx";
-import SearchMissions from '../assets/components/SearchMissions.jsx';
+import SearchMissionContainer from '../assets/components/SearchMissionContainer.jsx';
 
 export const loader = async ({ request }) => {
+  console.log("🔍 Loading URL:", request.url);
+  
   const params = Object.fromEntries([...new URL(request.url).searchParams.entries()]);
+  console.log("🔍 Search params:", params);
+  
   try {
     const { data } = await customFetch.get("/missions", { params });
-    console.log("Missions data:", data);
+    console.log("🔍 Missions data received:", data);
+    
     return {
       data,
       searchValues: { ...params },
     };
   } catch (error) {
-    toast.error(error?.response?.data?.msg);
-    return error;
+    console.error("❌ Error loading missions:", error);
+    toast.error(error?.response?.data?.msg || "Failed to load missions");
+    return {
+      data: { missions: [] },
+      searchValues: { ...params },
+      error: error?.response?.data?.msg || "Failed to load missions"
+    };
   }
 };
 
 const AllPostureContext = createContext();
 
 const AllPosture = () => {
-  const { data, searchValues } = useLoaderData();
+  const { data, searchValues, error } = useLoaderData();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (data && data.missions) {
-      console.log("Missions loaded:", data.missions);
-    } else {
-      console.log("No missions data available");
+    console.log("🔍 Loaded data:", data);
+    console.log("🔍 Search values:", searchValues);
+    
+    if (error) {
+      console.error("❌ Error:", error);
+      toast.error(error);
     }
-  }, [data]);
+    
+    if (data && data.missions) {
+      console.log(`🔍 Missions loaded: ${data.missions.length} items`);
+    } else {
+      console.log("🔍 No missions data available");
+    }
+  }, [data, searchValues, error]);
 
   return (
     <AllPostureContext.Provider value={{ data, searchValues }}>
-      <SearchMissions />
+      <SearchMissionContainer />
       <SoftDelete onClick={() => navigate("/dashboard/history-deleted-posture")}>
         <MdOutlineAutoDelete />
       </SoftDelete>

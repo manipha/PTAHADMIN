@@ -19,7 +19,7 @@ import { Form, useNavigate, redirect } from "react-router-dom";
 import { toast } from "react-toastify";
 import customFetch from "../utils/customFetch";
 
-// Loader ดึงข้อมูล patient และถ้ามีข้อมูล caregiver อยู่แล้วให้ merge ลงไปด้วย
+// Loader ดึงข้อมูล patient และถ้ามีข้อมูล caregiver ให้ดึงมาแสดงด้วย
 export const loader = async ({ params }) => {
   console.log("📌 Loading patient with ID:", params._id);
   try {
@@ -28,38 +28,29 @@ export const loader = async ({ params }) => {
 
     // ดึงข้อมูล patient จาก API
     const { data: patientData } = await customFetch.get(`/allusers/${_id}`);
+    
+    // เตรียมข้อมูลผลลัพธ์
+    const result = { patient: patientData, caregiver: null };
 
-    // ถ้าผู้ป่วยเลือกว่ามีผู้ดูแล (TYPE_CGV1) และมี ID_card_number
-    if (
-      patientData.youhaveCaregiver === HAVECAREGIVER.TYPE_CGV1 &&
-      patientData.ID_card_number
-    ) {
-      const { data: caregiverResponse } = await customFetch.get(
-        `/caregiver/${patientData.ID_card_number}`
-      );
-      if (
-        caregiverResponse &&
-        caregiverResponse.status === "Ok" &&
-        caregiverResponse.caregiver
-      ) {
-        // Merge ข้อมูลผู้ดูแลลงใน patientData รวมถึง caregiver _id ด้วย
-        patientData.ID_card_number =
-          caregiverResponse.caregiver.ID_card_number;
-        patientData.name = caregiverResponse.caregiver.name;
-        patientData.surname = caregiverResponse.caregiver.surname;
-        patientData.tel = caregiverResponse.caregiver.tel;
-        if (
-          caregiverResponse.caregiver.userRelationships &&
-          caregiverResponse.caregiver.userRelationships.length > 0
-        ) {
-          patientData.userRelationships =
-            caregiverResponse.caregiver.userRelationships[0].relationship;
+    // ถ้าผู้ป่วยมีหมายเลขบัตรประชาชน ให้ดึงข้อมูลผู้ดูแล (ถ้ามี)
+    if (patientData.ID_card_number) {
+      try {
+        // ดึงข้อมูลผู้ดูแลโดยใช้ ID ของคนไข้
+        const { data: caregiverResponse } = await customFetch.get(`/caregiver/patient/${_id}`);
+        
+        if (caregiverResponse && caregiverResponse.status === "Ok" && caregiverResponse.caregiver) {
+          result.caregiver = caregiverResponse.caregiver;
+          // ถ้ามีข้อมูลผู้ดูแล ให้ตั้งค่า youhaveCaregiver เป็น TYPE_CGV1 (มีผู้ดูแล)
+          result.patient.youhaveCaregiver = HAVECAREGIVER.TYPE_CGV1;
         }
-        // เก็บ caregiver _id เพื่อใช้ในการ update ใน action
-        patientData.caregiverId = caregiverResponse.caregiver._id;
+      } catch (error) {
+        console.log("No caregiver found for this patient, but it's OK");
+        // ถ้าไม่มีข้อมูลผู้ดูแล ไม่ต้องทำอะไร
       }
     }
-    return patientData;
+
+    console.log("Loader result:", result);
+    return result;
   } catch (error) {
     toast.error(error.response?.data?.msg);
     return redirect("/dashboard/all-patient");
@@ -72,6 +63,7 @@ export const action = async ({ request, params }) => {
   const formData = await request.formData();
   const data = Object.fromEntries(formData);
 
+  // แปลงค่า Boolean
   data.physicalTherapy = data.physicalTherapy === "true";
 
   console.log("📌 _id:", _id);
@@ -79,23 +71,47 @@ export const action = async ({ request, params }) => {
 
   try {
     if (!_id) throw new Error("Invalid ID");
-    // อัปเดตข้อมูล patient
-    await customFetch.patch(`/allusers/${_id}`, data);
+    
+    // สร้าง payload สำหรับอัปเดตข้อมูล patient
+    const patientPayload = {
+      name: data.name,
+      surname: data.surname,
+      email: data.email,
+      tel: data.tel,
+      gender: data.gender,
+      birthday: data.birthday,
+      ID_card_number: data.ID_card_number,
+      Address: data.Address,
+      userStatus: data.userStatus,
+      physicalTherapy: data.physicalTherapy,
+      youhaveCaregiver: data.youhaveCaregiver,
+      nationality: data.nationality,
+      username: data.username
+    };
 
-    // ถ้าเลือกว่ามีผู้ดูแล (TYPE_CGV1) ให้ส่งข้อมูลผู้ดูแลไปยัง API ของ caregiver
+    // อัปเดตข้อมูล patient
+    await customFetch.patch(`/allusers/${_id}`, patientPayload);
+
+    // ถ้าเลือกว่ามีผู้ดูแล (TYPE_CGV1) ให้สร้างหรืออัปเดตข้อมูลผู้ดูแล
     if (data.youhaveCaregiver === HAVECAREGIVER.TYPE_CGV1) {
+      // สร้าง payload สำหรับผู้ดูแล
       const caregiverPayload = {
-        ID_card_number: data.ID_card_number,
-        name: data.name,
-        surname: data.surname,
-        tel: data.tel,
-        Relationship: data.userRelationships,
-        user: data.user, // สมมติว่า field นี้มาจากข้อมูลผู้ใช้งาน
+        // ส่งค่าข้อมูลตามที่ backend รองรับ (ใช้ชื่อฟิลด์ที่มี prefix "caregiver")
+        caregiverID_card_number: data.caregiverID_card_number,
+        caregiverName: data.caregiverName,
+        caregiverSurname: data.caregiverSurname,
+        caregiverTel: data.caregiverTel,
+        caregiverRelationship: data.caregiverRelationship,
+        user: _id, // ID ของผู้ป่วย
       };
 
+      console.log("Caregiver payload:", caregiverPayload);
+
       if (data.caregiverId) {
+        // ถ้ามี caregiverId แสดงว่าผู้ดูแลมีอยู่แล้ว ให้อัปเดต
         await customFetch.patch(`/caregiver/${data.caregiverId}`, caregiverPayload);
       } else {
+        // ถ้าไม่มี caregiverId แสดงว่าต้องสร้างผู้ดูแลใหม่
         await customFetch.post(`/caregiver`, caregiverPayload);
       }
     }
@@ -137,37 +153,24 @@ const EditPatient = () => {
   const [selectedgender, setSelectedgender] = useState(
     patient.gender || ""
   );
-  const [selectedUserType, setSelectedUserType] = useState(
-    patient.userType || ""
-  );
-  const [selectedUserPosts, setSelectedUserPosts] = useState(
-    patient.userPosts || []
-  );
   const [selectedUserStatus, setSelectedUserStatus] = useState(
     patient.userStatus || ""
   );
-  const [postures, setPostures] = useState([]);
+  const [selectedYouhaveCaregiver, setSelectedYouhaveCaregiver] = useState(
+    patient.youhaveCaregiver || (caregiver ? HAVECAREGIVER.TYPE_CGV1 : "")
+  );
+  const [selectedCaregiverRelationship, setSelectedCaregiverRelationship] = useState(
+    caregiver?.userRelationships?.find(rel => rel.user === patient._id)?.relationship || ""
+  );
+  
   // Initialize birthday with formatted date
   const [birthday, setBirthday] = useState(formatBirthday(patient.birthday));
 
-  // State สำหรับข้อมูลผู้ดูแล
-  // หากมี caregiver อยู่แล้ว ให้ใช้ข้อมูลนั้น หากไม่มี ให้ใช้ค่าใน patient.youhaveCaregiver หรือ prompt
-  const initialHaveCaregiver = caregiver
-    ? HAVECAREGIVER.TYPE_CGV1
-    : patient.youhaveCaregiver || "โปรดเลือกว่ามีผู้ดูแลหรือไม่?";
-  const [selectedYouhaveCaregiver, setSelectedYouhaveCaregiver] = useState(initialHaveCaregiver);
-  const [caregiverIDCard, setCaregiverIDCard] = useState(caregiver?.ID_card_number || "");
-  const [caregiverName, setCaregiverName] = useState(caregiver?.name || "");
-  const [caregiverSurname, setCaregiverSurname] = useState(caregiver?.surname || "");
-  const [caregiverTel, setCaregiverTel] = useState(caregiver?.tel || "");
-  const [caregiverRelationship, setCaregiverRelationship] = useState(
-    caregiver?.userRelationships?.[0]?.relationship || ""
-  );
-
   const [patientData, setPatientData] = useState({
-    ...patient, // โหลดข้อมูลจาก `patient`
-    physicalTherapy: patient.physicalTherapy, // ค่าเริ่มต้น
+    ...patient,
+    physicalTherapy: patient.physicalTherapy,
   });
+
   // Handler สำหรับข้อมูลผู้ดูแล
   const handleYouhaveCaregiverChange = (event) => {
     setSelectedYouhaveCaregiver(event.target.value);
@@ -177,40 +180,13 @@ const EditPatient = () => {
     setSelectedCaregiverRelationship(event.target.value);
   };
 
-  useEffect(() => {
-    const fetchPostures = async () => {
-      try {
-        const { data } = await customFetch.get("/postures");
-        setPostures(data.postures);
-      } catch (error) {
-        toast.error(error?.response?.data?.msg);
-      }
-    };
-    fetchPostures();
-  }, []);
-
   const handleUserTypeChange = (event) => {
     setSelectedgender(event.target.value);
-    setSelectedUserType(event.target.value);
-    setSelectedUserStatus(event.target.value);
-    setSelectedYouhaveCaregiver(event.target.value);
   };
 
   const handleBirthdayChange = (event) => {
     console.log("Birthday changed to:", event.target.value);
     setBirthday(event.target.value);
-  };
-
-  const handleUserPostsChange = (selectedOptions) => {
-    setSelectedUserPosts(selectedOptions.map((option) => option.value));
-  };
-
-  const handleRelationChange = (event) => {
-    setSelectedRelation(event.target.value);
-  };
-
-  const handleOtherRelationChange = (event) => {
-    setOtherRelation(event.target.value);
   };
 
   const handleUserStatusChange = (event) => {
@@ -235,13 +211,11 @@ const EditPatient = () => {
 
           <input type="hidden" name="physicalTherapy" value={patientData.physicalTherapy ? "true" : "false"} />
 
-          {patient.caregiverId && (
-            <input type="hidden" name="caregiverId" value={patient.caregiverId} />
+          {caregiver && (
+            <input type="hidden" name="caregiverId" value={caregiver._id} />
           )}
 
-          <input type="hidden" name="user" value={patient.user || "defaultUserId"} />
-
-
+          <input type="hidden" name="user" value={patient._id} />
 
           <FormRow
             type="text"
@@ -253,25 +227,12 @@ const EditPatient = () => {
 
           <div className="row">
             <div className="column1">
-              {/* <FormRow
-                type="text"
-                name="idPatient"
-                labelText="หมายเลขผู้ป่วย"
-                pattern="[0-9]*"
-                defaultValue={patient.idPatient}
-              /> */}
               <FormRow
                 type="text"
                 name="name"
                 labelText="ชื่อผู้ป่วย"
                 defaultValue={patient.name}
               />
-              {/* <FormRow
-                type="text"
-                name="sickness"
-                labelText="โรคหรืออาการของผู้ป่วย"
-                defaultValue={patient.sickness}
-              /> */}
               <FormRowSelect
                 labelText="เพศ"
                 name="gender"
@@ -339,15 +300,6 @@ const EditPatient = () => {
             </div>
           </div>
 
-          {/* <FormRowMultiSelect
-            name="userPosts"
-            labelText="เลือกท่ากายภาพบำบัด"
-            value={selectedUserPosts}
-            options={["ท่าทั้งหมด", ...postures.map((p) => p.namePostures)]}
-            defaultValue={patient.userPosts}
-            onChange={handleUserPostsChange}
-          /> */}
-
           <hr />
           <br />
 
@@ -397,12 +349,11 @@ const EditPatient = () => {
                   <FormRowSelect
                     labelText="ความสัมพันธ์"
                     name="caregiverRelationship"
-                    value={caregiver?.userRelationships?.[0]?.relationship || ""}
+                    value={selectedCaregiverRelationship}
                     onChange={handleCaregiverRelationshipChange}
                     list={Object.values(RELATIONS)}
-                    defaultValue={caregiver?.userRelationships?.[0]?.relationship || ""}
+                    defaultValue={selectedCaregiverRelationship}
                   />
-
                 </div>
               </div>
             )}

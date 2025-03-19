@@ -1,6 +1,47 @@
 import { google } from "googleapis";
 import axios from "axios";
-import serviceAccount from "../firebase-service-account.json" assert { type: "json" }; // Import JSON ไฟล์โดยตรง
+// Option 1: Using fs and path (ES modules)
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Create equivalents to __dirname and __filename for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+let serviceAccount;
+try {
+  // Try different paths to find the firebase-service-account.json file
+  const possiblePaths = [
+    // Path if current working directory is the server folder
+    path.resolve('./firebase-service-account.json'),
+    // Path if current working directory is the project root
+    path.resolve('./server/firebase-service-account.json'),
+    // Path relative to this file
+    path.resolve(__dirname, '../firebase-service-account.json')
+  ];
+  
+  let fileFound = false;
+  for (const filePath of possiblePaths) {
+    try {
+      if (fs.existsSync(filePath)) {
+        serviceAccount = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        console.log(`Successfully loaded service account from: ${filePath}`);
+        fileFound = true;
+        break;
+      }
+    } catch (innerError) {
+      // Continue to next path
+    }
+  }
+  
+  if (!fileFound) {
+    throw new Error('Could not find firebase-service-account.json in any expected location');
+  }
+} catch (error) {
+  console.error('Failed to import service account JSON:', error);
+  throw new Error('Could not load firebase-service-account.json');
+}
 
 const PROJECT_ID = serviceAccount.project_id;
 const FCM_ENDPOINT = `https://fcm.googleapis.com/v1/projects/${PROJECT_ID}/messages:send`;
