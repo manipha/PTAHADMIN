@@ -48,7 +48,7 @@ export const GENDER = {
 
 export const POSTURES_SORT_BY = {
   NEWEST_FIRST: "ใหม่ที่สุด",
-  OLDEST_FIRST: "เก่าสุด",
+  OLDEST_FIRST: "เก่าที่สุด",
   ENG_ASCENDING: "เรียงจาก ก-ฮ",
   ENG_DESCENDING: "เรียงจาก ฮ-ก",
 };
@@ -83,7 +83,7 @@ export const FIREBASE_TOPIC = {
 
 export const MISSIONS_SORT_BY = {
   NEWEST_FIRST: "ใหม่ที่สุด",
-  OLDEST_FIRST: "เก่าสุด",
+  OLDEST_FIRST: "เก่าที่สุด",
   STAGE_ASCENDING: "เรียงตามจำนวนท่า น้อย-มาก",
   STAGE_DESCENDING: "เรียงตามจำนวนท่า มาก-น้อย",
   NAME_ASCENDING: "เรียงชื่อ ก-ฮ",

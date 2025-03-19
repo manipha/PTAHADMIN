@@ -16,6 +16,7 @@ const Posture = ({ _id, noPostures, namePostures, createdAt }) => {
   const date = day(createdAt).format("MMM Do, YYYY");
   return (
     <tr>
+      
       <td>{noPostures}</td>
       <td>{namePostures}</td>
       <td>

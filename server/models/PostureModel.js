@@ -23,7 +23,7 @@ const PostureSchema = new mongoose.Schema(
     isDeleted: {
       type: Boolean,
       default: false,
-    },
+    },updatedAt: { type: Date, required: true },
     deletedAt: {
       type: Date,
       default: null,

@@ -19,7 +19,7 @@ const AdminSchema = new mongoose.Schema(
     isEmailVerified: {
       type: Boolean,
       default: false,
-    },
+    },updatedAt: { type: Date, required: true },
   },
   { collection: "Admin", timestamps: true }
 );

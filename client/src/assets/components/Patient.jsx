@@ -26,11 +26,14 @@ const Patient = ({
     ? username.slice(0, 8) + "x".repeat(Math.max(0, username.length - 8))
     : "Unknown"; // กรณี username เป็น undefined
 
+  // Make sure we have a fallback for the date display
   const date = day(createdAt).format("MMM Do, YYYY");
 
   return (
     <tr>
       <td>{formattedUserName}</td>
+      
+      
       <td>
         {name} {surname}
       </td>

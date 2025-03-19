@@ -5,6 +5,7 @@ import {
   FormRowMultiSelect,
   FormRowRadio,
 } from "../assets/components";
+import FormRowSelectWithCustom from "../assets/components/FormRowSelectWithCustom";
 import Wrapper from "../assets/wrappers/DashboardFormPage";
 import { useLoaderData, useParams } from "react-router-dom";
 import {
@@ -19,40 +20,62 @@ import { Form, useNavigate, redirect } from "react-router-dom";
 import { toast } from "react-toastify";
 import customFetch from "../utils/customFetch";
 
-// Loader ดึงข้อมูล patient และถ้ามีข้อมูล caregiver ให้ดึงมาแสดงด้วย
+// Loader ดึงข้อมูล patient และถ้ามีข้อมูลผู้ดูแล (caregiver) ให้ดึงมาแสดงด้วย
 export const loader = async ({ params }) => {
   console.log("📌 Loading patient with ID:", params._id);
   try {
     const { _id } = params;
     if (!_id) throw new Error("Invalid ID");
 
-    // ดึงข้อมูล patient จาก API
-    const { data: patientData } = await customFetch.get(`/allusers/${_id}`);
+    // ดึงข้อมูล patient จาก API และแสดงรายละเอียดของ response
+    console.log("Fetching patient data from:", `/allusers/${_id}`);
+    const patientResponse = await customFetch.get(`/allusers/${_id}`);
+    console.log("Patient API response:", patientResponse.data);
+    
+    if (!patientResponse.data || !patientResponse.data.patient) {
+      console.error("API returned unexpected data structure:", patientResponse.data);
+      throw new Error("Invalid API response format");
+    }
+    
+    const patientData = patientResponse.data.patient;
+    console.log("Patient data loaded:", patientData);
     
     // เตรียมข้อมูลผลลัพธ์
     const result = { patient: patientData, caregiver: null };
 
     // ถ้าผู้ป่วยมีหมายเลขบัตรประชาชน ให้ดึงข้อมูลผู้ดูแล (ถ้ามี)
-    if (patientData.ID_card_number) {
-      try {
-        // ดึงข้อมูลผู้ดูแลโดยใช้ ID ของคนไข้
-        const { data: caregiverResponse } = await customFetch.get(`/caregiver/patient/${_id}`);
+    console.log("Checking for caregiver data...");
+    try {
+      // ดึงข้อมูลผู้ดูแลโดยใช้ ID ของคนไข้
+      const caregiverEndpoint = `/caregiver/patient/${_id}`;
+      console.log("Fetching caregiver data from:", caregiverEndpoint);
+      const caregiverResponse = await customFetch.get(caregiverEndpoint);
+      console.log("Caregiver API raw response:", caregiverResponse);
+      console.log("Caregiver API response data:", caregiverResponse.data);
+      
+      if (caregiverResponse.data && caregiverResponse.data.status === "Ok" && caregiverResponse.data.caregiver) {
+        result.caregiver = caregiverResponse.data.caregiver;
+        console.log("Caregiver data loaded:", result.caregiver);
+        console.log("Caregiver ID:", result.caregiver._id);
+        console.log("Caregiver name:", result.caregiver.caregiverName);
+        console.log("Caregiver relationship data:", result.caregiver.caregiverRelationship);
         
-        if (caregiverResponse && caregiverResponse.status === "Ok" && caregiverResponse.caregiver) {
-          result.caregiver = caregiverResponse.caregiver;
-          // ถ้ามีข้อมูลผู้ดูแล ให้ตั้งค่า youhaveCaregiver เป็น TYPE_CGV1 (มีผู้ดูแล)
-          result.patient.youhaveCaregiver = HAVECAREGIVER.TYPE_CGV1;
-        }
-      } catch (error) {
-        console.log("No caregiver found for this patient, but it's OK");
-        // ถ้าไม่มีข้อมูลผู้ดูแล ไม่ต้องทำอะไร
+        // ถ้ามีข้อมูลผู้ดูแล ให้ตั้งค่า youhaveCaregiver เป็น TYPE_CGV1 (มีผู้ดูแล)
+        result.patient.youhaveCaregiver = HAVECAREGIVER.TYPE_CGV1;
+      } else {
+        console.log("No caregiver data in response or invalid format");
       }
+    } catch (error) {
+      console.error("Error fetching caregiver data:", error);
+      console.log("Error response:", error.response?.data);
+      // ถ้าไม่มีข้อมูลผู้ดูแล ไม่ต้องทำอะไร
     }
 
-    console.log("Loader result:", result);
+    console.log("Final loader result:", result);
     return result;
   } catch (error) {
-    toast.error(error.response?.data?.msg);
+    console.error("Error loading patient data:", error);
+    toast.error(error?.response?.data?.msg || "ไม่สามารถโหลดข้อมูลผู้ป่วยได้");
     return redirect("/dashboard/all-patient");
   }
 };
@@ -90,43 +113,113 @@ export const action = async ({ request, params }) => {
     };
 
     // อัปเดตข้อมูล patient
-    await customFetch.patch(`/allusers/${_id}`, patientPayload);
+    const patientResponse = await customFetch.patch(`/allusers/${_id}`, patientPayload);
+    console.log("Updated patient response:", patientResponse.data);
 
     // ถ้าเลือกว่ามีผู้ดูแล (TYPE_CGV1) ให้สร้างหรืออัปเดตข้อมูลผู้ดูแล
     if (data.youhaveCaregiver === HAVECAREGIVER.TYPE_CGV1) {
       // สร้าง payload สำหรับผู้ดูแล
       const caregiverPayload = {
-        // ส่งค่าข้อมูลตามที่ backend รองรับ (ใช้ชื่อฟิลด์ที่มี prefix "caregiver")
+        // ใช้ชื่อฟิลด์ตามที่เป็นในโมเดล Caregiver
         caregiverID_card_number: data.caregiverID_card_number,
         caregiverName: data.caregiverName,
         caregiverSurname: data.caregiverSurname,
         caregiverTel: data.caregiverTel,
         caregiverRelationship: data.caregiverRelationship,
-        user: _id, // ID ของผู้ป่วย
+        // ส่งค่า user ID เพื่อเชื่อมโยงกับผู้ป่วย
+        user: _id 
       };
 
       console.log("Caregiver payload:", caregiverPayload);
 
-      if (data.caregiverId) {
-        // ถ้ามี caregiverId แสดงว่าผู้ดูแลมีอยู่แล้ว ให้อัปเดต
-        await customFetch.patch(`/caregiver/${data.caregiverId}`, caregiverPayload);
-      } else {
-        // ถ้าไม่มี caregiverId แสดงว่าต้องสร้างผู้ดูแลใหม่
-        await customFetch.post(`/caregiver`, caregiverPayload);
+      try {
+        if (data.caregiverId) {
+          // ถ้ามี caregiverId แสดงว่าผู้ดูแลมีอยู่แล้ว ให้อัปเดต
+          console.log("Updating existing caregiver ID:", data.caregiverId);
+          const updateResponse = await customFetch.patch(`/caregiver/${data.caregiverId}`, caregiverPayload);
+          console.log("Caregiver update response:", updateResponse.data);
+        } else {
+          // ถ้าไม่มี caregiverId แสดงว่าต้องสร้างผู้ดูแลใหม่
+          console.log("Creating new caregiver for patient ID:", _id);
+          const createResponse = await customFetch.post(`/caregiver`, caregiverPayload);
+          console.log("Created new caregiver:", createResponse.data);
+          
+          // อัปเดต patient ด้วย caregiver ID ที่สร้างใหม่
+          let newCaregiverId = null;
+          if (createResponse.data && createResponse.data.caregiver) {
+            newCaregiverId = createResponse.data.caregiver._id;
+          } else if (createResponse.data.newCaregiver) {
+            newCaregiverId = createResponse.data.newCaregiver._id;
+          } else if (createResponse.data.existingCaregiver) {
+            newCaregiverId = createResponse.data.existingCaregiver._id;
+          }
+          
+          if (newCaregiverId) {
+            console.log("Updating patient with new caregiver ID:", newCaregiverId);
+            const caregiverLinkResponse = await customFetch.patch(`/allusers/${_id}`, {
+              caregivers: [newCaregiverId]
+            });
+            console.log("Patient-caregiver link response:", caregiverLinkResponse.data);
+          } else {
+            console.error("Could not find caregiver ID in response", createResponse.data);
+          }
+        }
+      } catch (error) {
+        console.error("Error handling caregiver:", error);
+        console.error("Response data:", error.response?.data);
+        toast.error(error?.response?.data?.error || error?.response?.data?.msg || "เกิดข้อผิดพลาดในการจัดการข้อมูลผู้ดูแล");
+      }
+    } else if (data.caregiverId) {
+      // ถ้าเปลี่ยนจากมีผู้ดูแลเป็นไม่มี ให้ลบการอ้างอิงผู้ดูแล
+      try {
+        console.log("Removing caregiver relationship for patient ID:", _id);
+        const deleteResponse = await customFetch.delete(`/caregiver/${data.caregiverId}`, {
+          data: { userId: _id }
+        });
+        console.log("Caregiver relationship deletion response:", deleteResponse.data);
+        
+        // ลบการอ้างอิงผู้ดูแลจาก patient
+        const unlinkResponse = await customFetch.patch(`/allusers/${_id}`, {
+          caregivers: []
+        });
+        console.log("Patient-caregiver unlink response:", unlinkResponse.data);
+      } catch (error) {
+        console.error("Error removing caregiver reference:", error);
+        console.error("Response data:", error.response?.data);
       }
     }
 
     toast.success("แก้ไขข้อมูลคนไข้และผู้ดูแลเรียบร้อยแล้ว");
     return redirect("/dashboard/all-patient");
   } catch (error) {
-    toast.error(error?.response?.data?.msg);
+    console.error("Error saving data:", error);
+    console.error("Response data:", error.response?.data);
+    toast.error(error?.response?.data?.msg || "เกิดข้อผิดพลาดในการบันทึกข้อมูล");
     return error;
   }
 };
 
-
 const EditPatient = () => {
   const { patient, caregiver } = useLoaderData();
+  console.log("EditPatient component rendering with:", { patient, caregiver });
+  
+  // ตรวจสอบว่าข้อมูลผู้ป่วยมีอยู่จริง
+  if (!patient) {
+    return <div className="loading">กำลังโหลดข้อมูลผู้ป่วย...</div>;
+  }
+
+  // Debug display for caregiver
+  console.log("CAREGIVER DATA FROM LOADER:", caregiver);
+  if (caregiver) {
+    console.log("Caregiver ID:", caregiver._id);
+    console.log("Caregiver ID_card_number:", caregiver.caregiverID_card_number);
+    console.log("Caregiver name:", caregiver.caregiverName);
+    console.log("Caregiver surname:", caregiver.caregiverSurname);
+    console.log("Caregiver tel:", caregiver.caregiverTel);
+    console.log("Caregiver relationship:", caregiver.caregiverRelationship);
+  } else {
+    console.log("NO CAREGIVER DATA AVAILABLE");
+  }
 
   // Format the birthday for the date input (YYYY-MM-DD format)
   const formatBirthday = (dateString) => {
@@ -148,6 +241,28 @@ const EditPatient = () => {
     }
   };
 
+  // Debug info about caregiver relationship data
+  if (caregiver) {
+    console.log("Caregiver relationship data:", caregiver.caregiverRelationship);
+    
+    // Check if it's an array and has data
+    if (Array.isArray(caregiver.caregiverRelationship) && caregiver.caregiverRelationship.length > 0) {
+      console.log("First relationship item:", caregiver.caregiverRelationship[0]);
+      console.log("Patient ID for comparison:", patient._id);
+      
+      // Find the relationship that matches this patient
+      const relationship = caregiver.caregiverRelationship.find(
+        rel => rel.user && rel.user.toString() === patient._id.toString()
+      );
+      
+      if (relationship) {
+        console.log("Found matching relationship:", relationship);
+      } else {
+        console.log("No matching relationship found for this patient");
+      }
+    }
+  }
+
   const navigation = useNavigate();
   const isSubmitting = navigation.state === "submitting";
   const [selectedgender, setSelectedgender] = useState(
@@ -159,8 +274,20 @@ const EditPatient = () => {
   const [selectedYouhaveCaregiver, setSelectedYouhaveCaregiver] = useState(
     patient.youhaveCaregiver || (caregiver ? HAVECAREGIVER.TYPE_CGV1 : "")
   );
+  
+  // Find the caregiver relationship for this patient
+  let initialCaregiverRelationship = "";
+  if (caregiver && Array.isArray(caregiver.caregiverRelationship)) {
+    const relationshipObj = caregiver.caregiverRelationship.find(
+      rel => rel.user && rel.user.toString() === patient._id.toString()
+    );
+    if (relationshipObj) {
+      initialCaregiverRelationship = relationshipObj.relationship;
+    }
+  }
+  
   const [selectedCaregiverRelationship, setSelectedCaregiverRelationship] = useState(
-    caregiver?.userRelationships?.find(rel => rel.user === patient._id)?.relationship || ""
+    initialCaregiverRelationship || ""
   );
   
   // Initialize birthday with formatted date
@@ -171,12 +298,22 @@ const EditPatient = () => {
     physicalTherapy: patient.physicalTherapy,
   });
 
+  // Add state for custom relationship
+  const [otherRelation, setOtherRelation] = useState("");
+  
   // Handler สำหรับข้อมูลผู้ดูแล
   const handleYouhaveCaregiverChange = (event) => {
     setSelectedYouhaveCaregiver(event.target.value);
   };
 
+  // Update relationship change handler
   const handleCaregiverRelationshipChange = (event) => {
+    console.log("Relationship changed:", event.target.value);
+    setSelectedCaregiverRelationship(event.target.value);
+  };
+
+  const handleOtherRelationChange = (event) => {
+    setOtherRelation(event.target.value);
     setSelectedCaregiverRelationship(event.target.value);
   };
 
@@ -322,50 +459,61 @@ const EditPatient = () => {
             {selectedYouhaveCaregiver === HAVECAREGIVER.TYPE_CGV1 && (
               <div className="row">
                 <div className="column1">
+                  {/* Debug information */}
+                  {caregiver && (
+                    <div className="debug-info" style={{margin: '10px 0', padding: '10px', border: '1px solid #eee', borderRadius: '4px', fontSize: '12px', display: 'none'}}>
+                      <p>Caregiver Debug Info:</p>
+                      <pre>{JSON.stringify(caregiver, null, 2)}</pre>
+                    </div>
+                  )}
+                  
                   <FormRow
                     type="text"
                     name="caregiverID_card_number"
                     labelText="หมายเลขบัตรประชาชน (ผู้ดูแล)"
-                    defaultValue={caregiver?.ID_card_number || ""}
+                    defaultValue={caregiver?.caregiverID_card_number || ""}
+                    required={true}
                   />
                   <FormRow
                     type="text"
                     name="caregiverName"
                     labelText="ชื่อ (ผู้ดูแล)"
-                    defaultValue={caregiver?.name || ""}
+                    defaultValue={caregiver?.caregiverName || ""}
+                    required={true}
                   />
                   <FormRow
                     type="text"
                     name="caregiverSurname"
                     labelText="นามสกุล (ผู้ดูแล)"
-                    defaultValue={caregiver?.surname || ""}
+                    defaultValue={caregiver?.caregiverSurname || ""}
+                    required={true}
                   />
                   <FormRow
                     type="tel"
                     name="caregiverTel"
                     labelText="เบอร์โทรศัพท์ (ผู้ดูแล)"
-                    defaultValue={caregiver?.tel || ""}
+                    defaultValue={caregiver?.caregiverTel || ""}
+                    required={true}
                   />
-                  <FormRowSelect
-                    labelText="ความสัมพันธ์"
+                  <FormRowSelectWithCustom
                     name="caregiverRelationship"
-                    value={selectedCaregiverRelationship}
-                    onChange={handleCaregiverRelationshipChange}
-                    list={Object.values(RELATIONS)}
+                    labelText="ความสัมพันธ์กับผู้ป่วย"
+                    list={Object.values(RELATIONS).filter(val => val !== "อื่นๆ")}
                     defaultValue={selectedCaregiverRelationship}
+                    onChange={handleCaregiverRelationshipChange}
+                    required={true}
                   />
                 </div>
               </div>
             )}
           </div>
 
-          {/* <br /> */}
           <button
             type="submit"
             className="btn btn-block form-btn"
             disabled={isSubmitting}
           >
-            {isSubmitting ? "กำลังบันทึก" : "บันทึก"}
+            {isSubmitting ? "กำลังบันทึก..." : "บันทึก"}
           </button>
 
         </div>
@@ -373,4 +521,5 @@ const EditPatient = () => {
     </Wrapper>
   );
 };
+
 export default EditPatient;

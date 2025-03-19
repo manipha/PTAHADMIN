@@ -5,69 +5,35 @@ import Submission from "../models/SubmissionModel.js";
 import { TYPEPOSTURES } from "../utils/constants.js";
 
 export const getAllMissions = async (req, res) => {
-  console.log("\n====================================");
-  console.log("🔍 Request Query:", req.query);
-  const { search, sort, page, limit, missionType } = req.query;
+  // เก็บค่าพารามิเตอร์จาก URL
+  const { search, missionType, page, limit, sort = "ใหม่ที่สุด" } = req.query;
+  console.log("Mission query params:", { search, missionType, page, limit, sort });
 
-  // Print out all available mission types from constants
-  console.log("🔍 TYPEPOSTURES from constants:", TYPEPOSTURES);
-  
-  // สร้าง queryObject โดยเริ่มต้นที่ isDeleted !== true
-  const queryObject = { isDeleted: { $ne: true } };
+  // เริ่มต้นด้วย object ว่าง
+  const queryObject = {
+    isDeleted: { $ne: true } // ไม่แสดงข้อมูลที่ถูกลบ
+  };
 
-  // ถ้ามี search parameter ให้ค้นหาจาก no หรือ name
+  // ถ้ามี search หรือ missionType ให้เพิ่มเงื่อนไขในการค้นหา
   if (search) {
-    console.log("🔍 Searching for:", search);
-    
-    // แก้ไขการค้นหา - แยกการค้นหาสำหรับ no และ name
-    const searchConditions = [];
-    
-    // ถ้า search เป็นตัวเลข ให้ค้นหาจาก no โดยตรง
-    const numberSearch = Number(search);
-    if (!isNaN(numberSearch)) {
-      searchConditions.push({ no: numberSearch });
-    }
-    
-    // เพิ่มเงื่อนไขค้นหาจาก name ด้วย regex
-    searchConditions.push({ name: { $regex: search, $options: "i" } });
-    
-    queryObject.$or = searchConditions;
+    console.log(`🔍 Searching for: "${search}"`);
+    queryObject.$or = [
+      { name: { $regex: search, $options: "i" } },
+      { no: isNaN(Number(search)) ? { $exists: true } : Number(search) }
+    ];
   }
 
-  // แก้ไขการกรองด้วย missionType - เปลี่ยนเป็นกรองด้วย name แทน
   if (missionType && missionType !== "ทั้งหมด") {
-    console.log("🔍 Filtering by mission type:", missionType);
+    console.log(`🔍 Filtering by mission type: "${missionType}"`);
     
-    // เนื่องจากพบว่า mission ทั้งหมดมี type เป็น "เรียนรู้การจัดท่าในชีวิตประจำวัน" เหมือนกันหมด
-    // แต่ชื่อ mission มีความสอดคล้องกับประเภทที่ควรจะเป็น
-    // จึงแก้ปัญหาโดยการค้นหาจากชื่อ mission แทนการค้นหาจาก missionType
+    // ค้นหารูปแบบต่างๆ ของ mission type
+    queryObject.$or = [];
     
-    // 1. กรอง mission ที่มีชื่อตรงกับค่า missionType ที่ส่งมา
-    if (!queryObject.$or) {
-      queryObject.$or = [];
-    }
+    // 1. ตรวจสอบตรงๆ กับค่าใน TYPEPOSTURES
+    queryObject.$or.push({ missionType: { $regex: missionType, $options: "i" } });
     
-    // เปรียบเทียบว่า missionType ที่ส่งมาตรงกับค่าใดใน TYPEPOSTURES
-    let matchingTypeValues = [];
-    const typepostureValues = Object.values(TYPEPOSTURES);
-    
-    if (typepostureValues.includes(missionType)) {
-      matchingTypeValues.push(missionType);
-    } else {
-      // ถ้าไม่ตรงกับค่าใน TYPEPOSTURES ให้ลองหาแบบคร่าวๆ
-      for (const [key, value] of Object.entries(TYPEPOSTURES)) {
-        if (value.includes(missionType) || missionType.includes(value)) {
-          matchingTypeValues.push(value);
-        }
-      }
-    }
-    
-    console.log("🔍 Matching type values:", matchingTypeValues);
-    
-    // เพิ่มเงื่อนไขการค้นหาจากชื่อของ mission แทน mission type
-    matchingTypeValues.forEach(typeValue => {
-      queryObject.$or.push({ name: { $regex: typeValue, $options: "i" } });
-    });
+    // 2. ตรวจสอบว่าชื่อมิชชั่นมีคำที่ระบุหรือไม่
+    queryObject.$or.push({ name: { $regex: missionType, $options: "i" } });
     
     // 2. ถ้ายังไม่มีเงื่อนไขการค้นหา ให้ใช้ missionType โดยตรง
     if (queryObject.$or.length === 0) {
@@ -83,79 +49,16 @@ export const getAllMissions = async (req, res) => {
   const skip = (pageNum - 1) * limitNum;
 
   try {
-    // กำหนดตัวเลือกสำหรับการ sort โดยตรวจสอบค่าที่ถูกส่งมา
-    console.log("🔍 Sort parameter:", sort);
-    
-    // ตรวจสอบว่ากำลังจะเรียงตาม submissions หรือไม่
-    const isSortBySubmissions = 
-      sort === "เรียงตามจำนวนท่า น้อย-มาก" || 
-      sort === "เรียงตามจำนวนท่า มาก-น้อย";
-      
-    if (isSortBySubmissions) {
-      console.log("🔍 Sorting by submission count");
-      
-      // First, get all missions with their submission counts for sorting
-      const missionsWithCounts = await Mission.aggregate([
-        { $match: queryObject },
-        { 
-          $addFields: { 
-            submissionCount: { $size: { $ifNull: ["$submission", []] } } 
-          } 
-        },
-        { $sort: { submissionCount: sort === "เรียงตามจำนวนท่า มาก-น้อย" ? -1 : 1 } },
-        { $skip: skip },
-        { $limit: limitNum }
-      ]);
-      
-      console.log(`🔍 Found ${missionsWithCounts.length} missions for sorting by submission count`);
-      
-      // Get the IDs of the sorted missions
-      const missionIds = missionsWithCounts.map(m => m._id);
-      
-      // Then use a normal find with populate to get the full mission data with the proper sorted order
-      const missions = await Mission.find({ _id: { $in: missionIds } })
-        .populate({
-          path: "submission",
-          model: "submissions",
-        });
-      
-      // Sort the results to match the original order from the aggregation
-      const orderedMissions = missionIds.map(id => 
-        missions.find(m => m._id.toString() === id.toString())
-      ).filter(Boolean);
-      
-      const totalMissions = await Mission.countDocuments(queryObject);
-      const numOfPages = Math.ceil(totalMissions / limitNum);
-      
-      console.log(`🔍 Final mission count after populate: ${orderedMissions.length}`);
-      
-      if (orderedMissions.length > 0 && orderedMissions.length <= 10) {
-        console.log("🔍 Mission results sample (sorted by submission count):");
-        orderedMissions.slice(0, 10).forEach(m => {
-          const submissionCount = m.submission ? m.submission.length : 0;
-          console.log(`  ID: ${m._id}, Name: ${m.name}, Submissions: ${submissionCount}`);
-        });
-      }
-      
-      // ส่งผลลัพธ์กลับไปยัง client
-      return res.status(StatusCodes.OK).json({
-        totalMissions,
-        numOfPages,
-        currentPage: pageNum,
-        missions: orderedMissions,
-      });
-    }
-    
     // ถ้าไม่ได้เรียงตาม submissions ให้ใช้วิธีปกติ
     const sortOptions = {
-      "ใหม่ที่สุด": "-createdAt",
-      "เก่าสุด": "createdAt",
+      "ใหม่ที่สุด": "-updatedAt",
+      "เก่าที่สุด": "updatedAt",
       "เรียงชื่อ ก-ฮ": "name",
       "เรียงชื่อ ฮ-ก": "-name",
     };
     
     // ใช้ sortKey จากตัวเลือก
-    const sortKey = sortOptions[sort] || "-createdAt";
+    const sortKey = sortOptions[sort] || sortOptions["ใหม่ที่สุด"];
     console.log("🔍 Using sort key:", sortKey);
     
     // ดึงข้อมูลด้วย find และ sort ปกติ
@@ -168,29 +71,39 @@ export const getAllMissions = async (req, res) => {
         model: "submissions",
       });
     
+    // Debug timestamp data more extensively
+    if (missions.length > 0) {
+      const firstMission = missions[0];
+      console.log("🔍 First mission document structure:");
+      console.log("  Document keys:", Object.keys(firstMission._doc || firstMission).join(', '));
+      console.log("  createdAt exists:", firstMission.hasOwnProperty('createdAt'));
+      console.log("  createdAt type:", firstMission.createdAt ? typeof firstMission.createdAt : 'undefined');
+      console.log("  createdAt value:", firstMission.createdAt);
+      console.log("  _id timestamp:", firstMission._id.getTimestamp());
+      
+      console.log("🔍 Mission results sample:");
+      missions.slice(0, 5).forEach(mission => {
+        const submissionCount = mission.submission ? mission.submission.length : 0;
+        // Use explicit date conversion to ensure we're seeing the actual value
+        const createdDate = mission.createdAt 
+          ? new Date(mission.createdAt).toISOString() 
+          : 'undefined';
+        console.log(`  ID: ${mission._id}, No: ${mission.no}, Name: ${mission.name}, Type: ${mission.missionType}, Submissions: ${submissionCount}, CreatedAt: ${createdDate}`);
+      });
+    }
+    
     const totalMissions = await Mission.countDocuments(queryObject);
     const numOfPages = Math.ceil(totalMissions / limitNum);
     
     console.log(`🔍 Found ${missions.length} missions out of ${totalMissions} total`);
-    
-    // แสดงตัวอย่างข้อมูลที่ได้
-    if (missions.length > 0 && missions.length <= 10) {
-      console.log("🔍 Mission results sample:");
-      missions.slice(0, 10).forEach(m => {
-        const submissionCount = m.submission ? m.submission.length : 0;
-        console.log(`  ID: ${m._id}, No: ${m.no}, Name: ${m.name}, Type: ${m.missionType}, Submissions: ${submissionCount}`);
-      });
-    } 
-    
-    // กรณีไม่พบข้อมูล
-    else if (missions.length === 0 && missionType && missionType !== "ทั้งหมด") {
+    if (missions.length === 0 && missionType && missionType !== "ทั้งหมด") {
       console.log("⚠️ No missions found with this filter. Sample data without filter:");
       
       const anyMissions = await Mission.find({ isDeleted: { $ne: true } }).limit(5);
       if (anyMissions.length > 0) {
         anyMissions.forEach(m => {
           const submissionCount = m.submission ? m.submission.length : 0;
-          console.log(`  ID: ${m._id}, No: ${m.no}, Name: ${m.name}, Type: ${m.missionType}, Submissions: ${submissionCount}`);
+          console.log(`  ID: ${m._id}, No: ${m.no}, Name: ${m.name}, Type: ${m.missionType}, Submissions: ${submissionCount}, Created: ${m.createdAt}`);
         });
       } else {
         console.log("⚠️ No missions found in database at all");
@@ -200,18 +113,17 @@ export const getAllMissions = async (req, res) => {
     console.log("====================================\n");
     
     // ส่งผลลัพธ์กลับไปยัง client
-    res.status(StatusCodes.OK).json({
+    return res.status(StatusCodes.OK).json({
       totalMissions,
       numOfPages,
       currentPage: pageNum,
       missions,
     });
-
   } catch (error) {
     console.error("❌ Error in getAllMissions:", error);
-    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-      msg: "Error retrieving missions",
-      error: error.message
+    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      msg: "Failed to retrieve missions",
+      error: error.message,
     });
   }
 };

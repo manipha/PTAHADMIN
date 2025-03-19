@@ -7,6 +7,7 @@ import {
 } from "../../utils/constants";
 import { useAllDoctorContext } from "../../pages/AllDoctor";
 import { debounce } from "../../utils/debounce";
+import { useState, useEffect } from "react";
 
 const SearchMPersonnel = () => {
   const { searchValues } = useAllDoctorContext();
@@ -14,18 +15,56 @@ const SearchMPersonnel = () => {
   const { search = "", nametitle = "", sort = "" } = searchValues || {};
   const submit = useSubmit();
 
+  // Handle search input changes with debounce
+  const handleSearchChange = debounce((form) => {
+    console.log("Doctor search changed, submitting form");
+    const formData = new FormData(form);
+    
+    // Debug FormData contents for search
+    console.log("Form data for search:");
+    for (let [key, value] of formData.entries()) {
+      console.log(`${key}: ${value}`);
+    }
+    
+    submit(formData, { method: 'get' });
+  });
+
+  // Handle nametitle changes
+  const handleNameTitleChange = (e) => {
+    const form = e.currentTarget.form;
+    const selectedTitle = e.target.value;
+    
+    console.log("Name title changed to:", selectedTitle);
+    
+    // Create new form data with updated title
+    const formData = new FormData(form);
+    formData.set('nametitle', selectedTitle);
+    
+    // Debug FormData contents
+    console.log("Form data before submission:");
+    for (let [key, value] of formData.entries()) {
+      console.log(`${key}: ${value}`);
+    }
+    
+    // Submit the form with the new data
+    submit(formData, { method: 'get' });
+  };
+
+  // Log current search values for debugging
+  useEffect(() => {
+    console.log("Current doctor search filters:", { search, nametitle, sort });
+  }, [search, nametitle, sort]);
+
   return (
     <Wrapper>
-      <Form className="form">
+      <Form className="form" method="get">
         <div className="form-center">
           <FormRow
             labelText="ค้นหา"
             type="search"
             name="search"
             defaultValue={search}
-            onChange={debounce((form) => {
-              submit(form);
-            })}
+            onChange={(e) => handleSearchChange(e.currentTarget.form)}
           />
 
           <FormRowSelect
@@ -33,9 +72,7 @@ const SearchMPersonnel = () => {
             name="nametitle"
             list={["ทั้งหมด", ...Object.values(PREFIXDOCTOR)]}
             defaultValue={nametitle}
-            onChange={(e) => {
-              submit(e.currentTarget.form);
-            }}
+            onChange={handleNameTitleChange}
           />
 
           <FormRowSelect
@@ -44,7 +81,8 @@ const SearchMPersonnel = () => {
             defaultValue={sort}
             list={[...Object.values(POSTURES_SORT_BY)]}
             onChange={(e) => {
-              submit(e.currentTarget.form);
+              console.log("Sort changed to:", e.target.value);
+              submit(e.currentTarget.form, { method: 'get' });
             }}
           />
         </div>

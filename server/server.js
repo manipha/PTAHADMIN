@@ -9,9 +9,6 @@ import cookieParser from "cookie-parser";
 import cron from "node-cron";
 import admin from "firebase-admin";
 import morgan from "morgan";
-import { fileURLToPath } from 'url';
-import fs from 'fs';
-import path from 'path';
 
 // Routers
 import PatientRouter from "./routes/PatientRouter.js";
@@ -74,33 +71,8 @@ io.on("connection", (socket) => {
 });
 
 // Firebase
-// Create equivalents to __dirname and __filename for ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Try different paths to find the firebase-service-account.json file
-const possibleFirebasePaths = [
-  path.resolve('./firebase-service-account.json'),
-  path.resolve('./server/firebase-service-account.json'),
-  path.resolve(__dirname, './firebase-service-account.json')
-];
-
-let serviceAccountPath;
-for (const filePath of possibleFirebasePaths) {
-  if (fs.existsSync(filePath)) {
-    serviceAccountPath = filePath;
-    console.log(`Using Firebase service account from: ${filePath}`);
-    break;
-  }
-}
-
-if (!serviceAccountPath) {
-  console.error('Could not find firebase-service-account.json for admin initialization');
-  process.exit(1);
-}
-
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccountPath),
+  credential: admin.credential.cert("./firebase-service-account.json"),
 });
 
 // API Routes

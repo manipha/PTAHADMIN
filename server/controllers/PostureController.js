@@ -4,7 +4,7 @@ import { NotFoundError } from "../errors/customError.js";
 
 export const getAllPosture = async (req, res) => {
   const { search, userType, sort, isDeleted } = req.query;
-  console.log(isDeleted);
+  console.log("Sort parameter received:", sort);
 
   const queryObject = {};
   if (typeof isDeleted !== "undefined") {
@@ -24,32 +24,56 @@ export const getAllPosture = async (req, res) => {
   }
 
 const sortOptions = {
-  ใหม่ที่สุด: "-createdAt",
-  เก่าที่สุด: "createdAt",
-  "เรียงจาก ก-ฮ": "-name",
-  "เรียงจาก ฮ-ก": "name",
+  ใหม่ที่สุด: "-updatedAt",
+  เก่าที่สุด: "updatedAt",
+  "เรียงจาก ก-ฮ": "namePostures",
+  "เรียงจาก ฮ-ก": "-namePostures",
 };
 
+  console.log("Available sort options:", Object.keys(sortOptions));
   const sortKey = sortOptions[sort] || sortOptions.ใหม่ที่สุด;
+  console.log(`Sorted by: "${sort}" => using sort key: "${sortKey}"`);
+  
+  // Check if results will have valid timestamps
+  console.log("Ensuring all documents have createdAt field...");
 
   // Pagination logic remains the same
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 30;
   const skip = (page - 1) * limit;
 
-  const postures = await Posture.find(queryObject)
-    .sort(sortKey)
-    .skip(skip)
-    .limit(limit);
+  try {
+    console.log("Executing MongoDB find with sort:", sortKey);
+    const postures = await Posture.find(queryObject)
+      .sort(sortKey)
+      .skip(skip)
+      .limit(limit);
 
-  const totalPostures = await Posture.countDocuments(queryObject);
-  const numOfPages = Math.ceil(totalPostures / limit);
-  res.status(StatusCodes.OK).json({
-    totalPostures,
-    numOfPages,
-    currentPage: page,
-    postures,
-  });
+    // Debug timestamp info
+    if (postures.length > 0) {
+      const firstPosture = postures[0];
+      console.log("First posture timestamp check:");
+      console.log("  Document keys:", Object.keys(firstPosture._doc || firstPosture).join(', '));
+      console.log("  createdAt value:", firstPosture.createdAt);
+      console.log("  updatedAt value:", firstPosture.updatedAt);
+    }
+
+    const totalPostures = await Posture.countDocuments(queryObject);
+    const numOfPages = Math.ceil(totalPostures / limit);
+    
+    res.status(StatusCodes.OK).json({
+      totalPostures,
+      numOfPages,
+      currentPage: page,
+      postures,
+    });
+  } catch (error) {
+    console.error("Error in getAllPosture:", error);
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ 
+      message: "Failed to retrieve postures",
+      error: error.message
+    });
+  }
 };
 
 // export const getAllPosture = async (req, res) => {

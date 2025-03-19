@@ -7,59 +7,132 @@ import {
 } from "../../server/utils/constants.js";
 
 export const getAllPatients = async (req, res) => {
-  const { search, userStatus, userType, sort, isDeleted } = req.query;
-  console.log(isDeleted);
+  try {
+    const { search, userStatus, userType, sort, isDeleted } = req.query;
+    console.log("Query params received in controller:", { search, userStatus, userType, sort, isDeleted });
 
-  const queryObject = {};
-  if (typeof isDeleted !== "undefined") {
-    queryObject.isDeleted = isDeleted === "true";
-  } else {
-    queryObject.isDeleted = { $nin: [true] };
+    // Start with an empty query object
+    const queryObject = {};
+    
+    // Handle soft delete filtering
+    if (typeof isDeleted !== "undefined") {
+      queryObject.isDeleted = isDeleted === "true";
+      console.log(`Setting isDeleted filter to: ${queryObject.isDeleted}`);
+    } else {
+      queryObject.isDeleted = { $nin: [true] };
+      console.log("Setting default isDeleted filter: exclude deleted records");
+    }
+
+    // Handle search term filtering
+    if (search) {
+      queryObject.$or = [
+        { username: { $regex: search, $options: "i" } },
+        { name: { $regex: search, $options: "i" } },
+        { surname: { $regex: search, $options: "i" } },
+      ];
+      console.log(`Adding search filter for: "${search}"`);
+    }
+
+    // Handle status filtering
+    if (userStatus && userStatus !== "ทั้งหมด") {
+      // ตรวจสอบว่า userStatus ที่ส่งมาตรงกับค่าที่มีอยู่ใน TYPESTATUS หรือไม่
+      const statusValues = Object.values(TYPESTATUS);
+      console.log("Valid status values:", statusValues);
+      
+      if (statusValues.includes(userStatus)) {
+        queryObject.userStatus = userStatus;
+        console.log(`Setting status filter to: ${userStatus}`);
+      } else {
+        console.log(`Invalid status value: ${userStatus}. Not adding to query.`);
+      }
+    } else {
+      console.log("No status filter applied or 'ทั้งหมด' selected.");
+    }
+
+    // Handle user type filtering
+    if (userType && userType !== "all") {
+      queryObject.userType = userType;
+      console.log(`Setting userType filter to: ${userType}`);
+    }
+
+    // Get sort options with simple string-based sorting like in NotificationController
+    const sortOptions = {
+      ใหม่ที่สุด: "-updatedAt", // Sort by updatedAt which exists in all documents
+      เก่าที่สุด: "updatedAt",
+      "เรียงจาก ก-ฮ": "name",
+      "เรียงจาก ฮ-ก": "-name",
+    };
+
+    // Get sort key from options
+    const sortKey = sortOptions[sort] ?? sortOptions.ใหม่ที่สุด;
+    console.log(`Using sort key: "${sortKey}"`);
+
+    // Handle pagination
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+    console.log(`Pagination: page ${page}, limit ${limit}, skip ${skip}`);
+
+    // Log final query
+    console.log("Final MongoDB query:", JSON.stringify(queryObject, null, 2));
+
+    // Retrieve patients based on query using simple find and sort
+    console.log("Executing patient find query...");
+    const allusers = await Patient.find(queryObject)
+      .sort(sortKey)
+      .skip(skip)
+      .limit(limit);
+    
+    // Debug timestamps in returned documents
+    if (allusers.length > 0) {
+      console.log("Checking first document fields:", Object.keys(allusers[0]).join(', '));
+    }
+    
+    // Count total matching patients
+    console.log("Counting total patients matching query...");
+    const totalPatients = await Patient.countDocuments(queryObject);
+    
+    // Get status distribution statistics
+    console.log("Getting status distribution statistics...");
+    const statusCounts = await Patient.aggregate([
+      { $match: { isDeleted: { $nin: [true] } } },
+      { $group: { _id: "$userStatus", count: { $sum: 1 } } }
+    ]);
+    
+    // Log results
+    console.log("Status distribution in database:", 
+      statusCounts.map(status => `${status._id}: ${status.count} patients`).join(", ")
+    );
+    
+    console.log(`Total patients in DB: ${await Patient.countDocuments({ isDeleted: { $nin: [true] } })}`);
+    console.log(`Found ${allusers.length} patients matching query out of ${totalPatients} total.`);
+    
+    // Log detailed info about retrieved patients
+    console.log("Found patients:", allusers.map(user => ({ 
+      id: user._id, 
+      name: user.name,
+      status: user.userStatus,
+      physicalTherapy: user.physicalTherapy,
+      isDeleted: user.isDeleted,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt
+    })));
+    
+    // Calculate pagination info
+    const numOfPages = Math.ceil(totalPatients / limit);
+    
+    // Send response
+    console.log(`Sending response with ${allusers.length} patients`);
+    res
+      .status(StatusCodes.OK)
+      .json({ totalPatients, numOfPages, currentPage: page, allusers });
+  } catch (error) {
+    console.error("Error in getAllPatients:", error);
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ 
+      msg: "Could not retrieve patients",
+      error: error.message 
+    });
   }
-
-  // เพิ่มเงื่อนไข physicalTherapy ต้องเป็น true
-  queryObject.physicalTherapy = true;
-
-  if (search) {
-    queryObject.$or = [
-      { username: { $regex: search, $options: "i" } },
-      { name: { $regex: search, $options: "i" } },
-      { surname: { $regex: search, $options: "i" } },
-    ];
-  }
-
-  if (userStatus && userStatus !== "ทั้งหมด") {
-    queryObject.userStatus = userStatus;
-  }
-
-  if (userType && userType !== "all") {
-    queryObject.userType = userType;
-  }
-
-  const sortOptions = {
-    ใหม่ที่สุด: "-createdAt",
-    เก่าที่สุด: "createdAt",
-    "เรียงจาก ก-ฮ": "-name",
-    "เรียงจาก ฮ-ก": "name",
-  };
-
-  const sortKey = sortOptions[sort] || sortOptions.ใหม่ที่สุด;
-
-  // แบ่งหน้า
-
-  const page = Number(req.query.page) || 1;
-  const limit = Number(req.query.limit) || 20;
-  const skip = (page - 1) * limit;
-
-  const allusers = await Patient.find(queryObject)
-    .sort(sortKey)
-    .skip(skip)
-    .limit(limit); // ลบ { createdBy: req.user.userId } เพื่อค้นหาข้อมูลทั้งหมด
-  const totalPatients = await Patient.countDocuments(queryObject);
-  const numOfPages = Math.ceil(totalPatients / limit);
-  res
-    .status(StatusCodes.OK)
-    .json({ totalPatients, numOfPages, currentPage: page, allusers });
 };
 
 // export const createPatient = async (req, res) => {

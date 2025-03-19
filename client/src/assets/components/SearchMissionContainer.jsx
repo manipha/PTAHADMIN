@@ -18,13 +18,22 @@ const SearchMissionContainer = () => {
   const handleSearch = (form) => {
     console.log("Search form submitted with:", form);
     
-    // ส่งฟอร์มไปยัง React Router DOM
-    submit(form);
+    // Create FormData to explicitly set values
+    const formData = new FormData(form);
+    
+    // Log form data for debugging
+    console.log("Form data:");
+    for (let [key, value] of formData.entries()) {
+      console.log(`${key}: ${value}`);
+    }
+    
+    // ส่งฟอร์มไปยัง React Router DOM with explicit method
+    submit(formData, { method: 'get' });
   };
 
   return (
     <Wrapper>
-      <Form className="form">
+      <Form className="form" method="get">
         <div className="form-center">
           <FormRow
             labelText="ค้นหา"
@@ -43,7 +52,9 @@ const SearchMissionContainer = () => {
             defaultValue={missionType || "ทั้งหมด"}
             onChange={(e) => {
               console.log("Mission type selected:", e.target.value);
-              submit(e.currentTarget.form);
+              const form = e.currentTarget.form;
+              const formData = new FormData(form);
+              submit(formData, { method: 'get' });
             }}
           />
 
@@ -54,7 +65,9 @@ const SearchMissionContainer = () => {
             list={[...Object.values(MISSIONS_SORT_BY)]}
             onChange={(e) => {
               console.log("Sort selected:", e.target.value);
-              submit(e.currentTarget.form);
+              const form = e.currentTarget.form;
+              const formData = new FormData(form);
+              submit(formData, { method: 'get' });
             }}
           />
         </div>

@@ -28,7 +28,6 @@ export const RELATIONS = {
   SPOUSE: "คู่สมรส",
   CHILD: "ลูก",
   OTHER: "อื่นๆ",
-  // otherRelations: "", // This will allow dynamic input for 'other' relationships
 };
 
 export const HAVECAREGIVER = {
@@ -48,7 +47,7 @@ export const GENDER = {
 
 export const POSTURES_SORT_BY = {
   NEWEST_FIRST: "ใหม่ที่สุด",
-  OLDEST_FIRST: "เก่าสุด",
+  OLDEST_FIRST: "เก่าที่สุด",
   ENG_ASCENDING: "เรียงจาก ก-ฮ",
   ENG_DESCENDING: "เรียงจาก ฮ-ก",
 };
@@ -83,7 +82,7 @@ export const FIREBASE_TOPIC = {
 
 export const MISSIONS_SORT_BY = {
   NEWEST_FIRST: "ใหม่ที่สุด",
-  OLDEST_FIRST: "เก่าสุด",
+  OLDEST_FIRST: "เก่าที่สุด",
   STAGE_ASCENDING: "เรียงตามด่าน น้อย-มาก",
   STAGE_DESCENDING: "เรียงตามด่าน มาก-น้อย",
   NAME_ASCENDING: "เรียงชื่อ ก-ฮ",

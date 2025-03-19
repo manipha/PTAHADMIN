@@ -39,11 +39,11 @@ const PatientSchema = new mongoose.Schema(
     createdBy: {
       type: mongoose.Types.ObjectId,
       ref: "User", // ผู้ใช้งานที่สร้างข้อมูลนี้
-    },
+    },updatedBy: { type: mongoose.Types.ObjectId, ref: "User" },
     isDeleted: {
       type: Boolean,
       default: false, // ระบุว่าลบข้อมูลแล้วหรือไม่
-    },
+    },updatedAt: { type: Date, required: true },
     deletedAt: {
       type: Date,
       default: null,

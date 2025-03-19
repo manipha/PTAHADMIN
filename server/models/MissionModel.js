@@ -19,6 +19,8 @@ const MissionSchema = new mongoose.Schema(
         },
     isEvaluate: { type: Boolean, default: false },
     isDeleted: { type: Boolean, default: false },
+    updatedBy: { type: mongoose.Types.ObjectId, ref: "User" },
+    updatedAt: { type: Date, required: true },
   },
   { timestamps: true }
 );

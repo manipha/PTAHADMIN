@@ -9,7 +9,7 @@ import { NotFoundError } from "../errors/customError.js";
 
 export const getAllDoctor = async (req, res) => {
   const { search, nametitle, sort, isDeleted } = req.query;
-  console.log(isDeleted);
+  console.log("Doctor search query:", { search, nametitle, sort, isDeleted });
 
   const queryObject = {};
   if (typeof isDeleted !== "undefined") {
@@ -17,40 +17,60 @@ export const getAllDoctor = async (req, res) => {
   } else {
     queryObject.isDeleted = { $nin: [true] };
   }
+  
   if (search) {
-    queryObject.$or = [{ name: { $regex: search, $options: "i" } }];
-    queryObject.$or = [{ surname: { $regex: search, $options: "i" } }];
+    // Fix the search query to include both name and surname in the $or array
+    queryObject.$or = [
+      { name: { $regex: search, $options: "i" } },
+      { surname: { $regex: search, $options: "i" } }
+    ];
+    console.log(`Searching for doctors with name/surname matching: "${search}"`);
   }
 
   if (nametitle && nametitle !== "ทั้งหมด") {
     queryObject.nametitle = nametitle;
+    console.log(`Filtering by title: ${nametitle}`);
   }
 
-const sortOptions = {
-  ใหม่ที่สุด: "-createdAt",
-  เก่าที่สุด: "createdAt",
-  "เรียงจาก ก-ฮ": "-name",
-  "เรียงจาก ฮ-ก": "name",
-};
-
+  // Get sort options
+  const sortOptions = {
+    ใหม่ที่สุด: "-updatedAt",
+    เก่าที่สุด: "updatedAt",
+    "เรียงจาก ก-ฮ": "name",
+    "เรียงจาก ฮ-ก": "-name",
+  };
 
   const sortKey = sortOptions[sort] || sortOptions.ใหม่ที่สุด;
+  console.log(`Sorting by: ${sortKey}`);
 
   // แบ่งหน้า
-
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 10;
   const skip = (page - 1) * limit;
 
-  const MPersonnel = await Doctor.find(queryObject)
-    .sort(sortKey)
-    .skip(skip)
-    .limit(limit); // ลบ { createdBy: req.user.userId } เพื่อค้นหาข้อมูลทั้งหมด
-  const totalMPersonnel = await Doctor.countDocuments(queryObject);
-  const numOfPages = Math.ceil(totalMPersonnel / limit);
-  res
-    .status(StatusCodes.OK)
-    .json({ totalMPersonnel, numOfPages, currentPage: page, MPersonnel });
+  console.log("Final query:", JSON.stringify(queryObject, null, 2));
+  
+  try {
+    const MPersonnel = await Doctor.find(queryObject)
+      .sort(sortKey)
+      .skip(skip)
+      .limit(limit);
+    
+    const totalMPersonnel = await Doctor.countDocuments(queryObject);
+    const numOfPages = Math.ceil(totalMPersonnel / limit);
+    
+    console.log(`Found ${MPersonnel.length} doctors out of ${totalMPersonnel} total`);
+    
+    res
+      .status(StatusCodes.OK)
+      .json({ totalMPersonnel, numOfPages, currentPage: page, MPersonnel });
+  } catch (error) {
+    console.error("Error in getAllDoctor:", error);
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ 
+      msg: "Could not retrieve doctors",
+      error: error.message 
+    });
+  }
 };
 
 export const createDoctor = async (req, res) => {

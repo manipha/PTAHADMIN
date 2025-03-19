@@ -11,7 +11,11 @@ const CaregiverScehma = new mongoose.Schema(
     caregiverRelationship: [
       {
         user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-        relationship: String,
+        relationship: {
+          type: String,
+          // Remove enum validation to allow any string value
+          required: true
+        },
       },
     ],
     // user: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // เปลี่ยนเป็น array

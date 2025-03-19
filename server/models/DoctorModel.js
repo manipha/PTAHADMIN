@@ -34,6 +34,8 @@ const MPersonnelSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    updatedBy: { type: mongoose.Types.ObjectId, ref: "User" },
+    updatedAt: { type: Date, required: true },
   },
   { collection: "MPersonnel",
     timestamps: true }

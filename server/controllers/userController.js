@@ -47,14 +47,14 @@ export const getAllAdmin = async (req, res) => {
     queryObject.$or = [{ name: { $regex: search, $options: "i" } }];
   }
 
+  // Get sort options
   const sortOptions = {
-    ใหม่ที่สุด: "-createdAt",
-    เก่าที่สุด: "createdAt",
-    "เรียงจาก ก-ฮ": "-name",
-    "เรียงจาก ฮ-ก": "name",
+    ใหม่ที่สุด: "-updatedAt",
+    เก่าที่สุด: "updatedAt",
+    "เรียงจาก ก-ฮ": "name",
+    "เรียงจาก ฮ-ก": "-name",
   };
-
-  const sortKey = sortOptions[sort] || sortOptions.ใหม่ที่สุด;
+  const sortKey = sortOptions[sort] ?? sortOptions.ใหม่ที่สุด;
 
   // แบ่งหน้า
 
@@ -119,7 +119,7 @@ export const deleteAdmin = async (req, res) => {
   try {
     const updatedAdmin = await User.findByIdAndUpdate(
       _id,
-      { isDeleted: true, deletedAt: new Date(), },
+      { isDeleted: true, deletedAt: new Date() },
       { new: true }
     );
 
@@ -140,6 +140,8 @@ export const getPhysicalTherapyUsers = async (req, res) => {
     const users = await Users.find({ physicalTherapy: true });
     res.status(StatusCodes.OK).json(users);
   } catch (error) {
-    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    res
+      .status(StatusCodes.INTERNAL_SERVER_ERROR)
+      .json({ message: error.message });
   }
 };
