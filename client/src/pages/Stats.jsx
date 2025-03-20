@@ -1,5 +1,5 @@
 import React from "react";
-import { ChartsContainer, StatsContainer } from "../assets/components";
+import { ChartsContainer, StatsContainer, ChartGenderAndAge } from "../assets/components";
 import customFetch from "../utils/customFetch";
 import { useLoaderData } from "react-router-dom";
 
@@ -13,10 +13,8 @@ export const loader = async () => {
   }
 };
 
-
 const Stats = () => {
-  const { defaultStats, monthlyApplications, monthlyApplications2 } =
-    useLoaderData();
+  const { defaultStats, monthlyApplications, monthlyApplications2, genderAgeStats } = useLoaderData();
 
   return (
     <>
@@ -32,6 +30,13 @@ const Stats = () => {
         <ChartsContainer
           data={monthlyApplications2}
           title="ข้อมูลจำนวนคนไข้ในระบบทั้งหมด"
+        />
+      )}
+
+      {genderAgeStats?.length > 1 && (
+        <ChartGenderAndAge
+          data={genderAgeStats}
+          title="ข้อมูลเพศและช่วงอายุคนไข้ในระบบทั้งหมด"
         />
       )}
     </>

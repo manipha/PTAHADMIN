@@ -21,6 +21,8 @@ export { default as DeletedPatient } from "./DeletedPatient";
 export { default as DeletedDoctor } from "./DeletedDoctor";
 export { default as DeletedAdmin } from "./DeletedAdmin";
 export { default as FormRowRadioButton } from "./FormRowRadioButton";
+export { default as ChartGenderAndAge } from "./ChartGenderAndAge";
+
 
 
 

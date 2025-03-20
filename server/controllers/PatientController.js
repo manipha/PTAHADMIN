@@ -250,7 +250,9 @@ export const deletePatient = async (req, res) => {
   }
 };
 
+// Controller: ดึงข้อมูลสถิติรวมถึงช่วงอายุและเพศ
 export const showStats = async (req, res) => {
+  // Aggregation สำหรับ userStatus
   let stats = await Patient.aggregate([
     { $group: { _id: "$userStatus", count: { $sum: 1 } } },
   ]);
@@ -274,6 +276,7 @@ export const showStats = async (req, res) => {
     ผู้ป่วยที่ทำกายภาพบำบัด: totalphysicalTherapyPatients || 0,
   };
 
+  // Aggregation สำหรับดึงข้อมูลเดือนที่มีการทำกายภาพบำบัด
   let monthlyApplications = await Patient.aggregate([
     { $match: { physicalTherapy: true } },
     {
@@ -302,6 +305,7 @@ export const showStats = async (req, res) => {
     })
     .reverse();
 
+  // Aggregation สำหรับดึงข้อมูลผู้ป่วยทั้งหมด (ไม่จำกัด physicalTherapy)
   let monthlyApplications2 = await Patient.aggregate([
     { $match: { createdAt: { $exists: true } } },
     {
@@ -333,5 +337,51 @@ export const showStats = async (req, res) => {
     })
     .reverse();
 
-  res.status(StatusCodes.OK).json({ defaultStats, monthlyApplications, monthlyApplications2 });
+  // Aggregation สำหรับข้อมูลเพศและช่วงอายุ (คำนวณจาก birthday)
+  let genderAgeStats = await Patient.aggregate([
+    // คำนวณอายุจากฟิลด์ birthday (แบบคำนวณเป็นปี)
+    {
+      $addFields: {
+        age: { $subtract: [ { $year: new Date() }, { $year: "$birthday" } ] }
+      }
+    },
+    // แปลงอายุเป็นช่วง (เช่น 0-19, 20-39, 40-59, 60-79, 80+)
+    {
+      $addFields: {
+        ageRange: {
+          $switch: {
+            branches: [
+              { case: { $lt: [ "$age", 20 ] }, then: "0-19" },
+              { case: { $lt: [ "$age", 40 ] }, then: "20-39" },
+              { case: { $lt: [ "$age", 60 ] }, then: "40-59" },
+              { case: { $lt: [ "$age", 80 ] }, then: "60-79" }
+            ],
+            default: "80+"
+          }
+        }
+      }
+    },
+    // กลุ่มข้อมูลตามเพศและช่วงอายุ
+    {
+      $group: {
+        _id: { gender: "$gender", ageRange: "$ageRange" },
+        count: { $sum: 1 }
+      }
+    },
+    // จัดรูปแบบผลลัพธ์ให้แสดงเฉพาะ gender, ageRange และ count
+    {
+      $project: {
+        gender: "$_id.gender",
+        ageRange: "$_id.ageRange",
+        count: 1,
+        _id: 0
+      }
+    },
+    {
+      $sort: { gender: 1, ageRange: 1 }
+    }
+  ]);
+
+  res.status(StatusCodes.OK).json({ defaultStats, monthlyApplications, monthlyApplications2, genderAgeStats });
 };
+
