@@ -36,6 +36,7 @@ const Login = () => {
   const isSubmitting = navigation.state === "submitting";
   return (
     <Wrapper>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-[#ffffff] to-[#a6ddffd1]">
       <Form method="post" className="form">
         <Logo />
         <h4>Login</h4>
@@ -52,6 +53,7 @@ const Login = () => {
           </Link> */}
         </p>
       </Form>
+      </div>
     </Wrapper>
   );
 };

@@ -26,12 +26,16 @@ const Wrapper = styled.aside`
       align-items: center;
       padding-left: 2.5rem;
     }
+    img.logo {
+      margin-left: -25px; /* ปรับค่า margin-left ตามที่ต้องการ */
+    }
     .nav-links {
       padding-top: 2rem;
       display: flex;
       flex-direction: column;
-      padding-bottom: 50rem;
+      padding-bottom: 60rem;
       background-color: #87cefa;
+      width: 250px;
     }
     .nav-link {
       display: flex;

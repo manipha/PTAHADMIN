@@ -228,9 +228,6 @@ export const sendPushNotification = async (notiItem) => {
       body: notiItem.description,
     },
     topic: "news",
-    // notiItem.targetGroup === NOTIFY_TARGET_GROUP.ALL
-    //   ? FIREBASE_TOPIC.ALL
-    //   : FIREBASE_TOPIC.UNDER_TREATMENT,
   };
 
   try {
