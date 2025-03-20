@@ -23,7 +23,7 @@ const Landing = () => {
           </Link> */}
 
           <Link to="/login" className="btn ">
-            เข้าใช้งาน
+            เข้าใช้งาน PTAH
           </Link>
           <a 
         href={`https://homeward.vercel.app/`}
