@@ -1,47 +1,30 @@
-import React, { useState } from "react";
-import { BarChart, LineChart } from "@mui/x-charts"; // ใช้ LineChart แทน AreaChart
+import { useState } from "react";
+
+import BarChart from "./BarChart";
+import AreaChart from "./AreaChart";
 import Wrapper from "../wrappers/ChartsContainer";
 
 const ChartGenderAndAge = ({ data, title }) => {
-  const [useBarChart, setUseBarChart] = useState(true);
+  const [barChart, setBarChart] = useState(true);
 
-  const ageRanges = ["0-19", "20-39", "40-59", "60-79", "80+"];
-
-  const maleData = data.filter((item) => item.gender === "ชาย");
-  const femaleData = data.filter((item) => item.gender === "หญิง");
-
-  const maleSeriesData = ageRanges.map((range) => {
-    const found = maleData.find((item) => item.ageRange === range);
-    return found ? found.count : 0;
-  });
-
-  const femaleSeriesData = ageRanges.map((range) => {
-    const found = femaleData.find((item) => item.ageRange === range);
-    return found ? found.count : 0;
-  });
-
-  const chartProps = {
-    xAxis: [{ scaleType: "band", data: ageRanges }],
-    series: [
-      { data: maleSeriesData, name: "ชาย" },
-      { data: femaleSeriesData, name: "หญิง" },
-    ],
-    width: 500,
-    height: 300,
-  };
+  // กรองข้อมูลสำหรับเพศชายและเพศหญิง
+  const maleData = data.filter(item => item.gender === "ชาย");
+  const femaleData = data.filter(item => item.gender === "หญิง");
 
   return (
     <Wrapper>
       <h4>{title}</h4>
-      <button type="button" onClick={() => setUseBarChart((prev) => !prev)}>
-        {useBarChart ? "Switch to Area Chart" : "Switch to Bar Chart"}
+      <button type="button" onClick={() => setBarChart(!barChart)}>
+        {barChart ? "Bar Chart" : "Area Chart"}
       </button>
-      {useBarChart ? (
-        <BarChart {...chartProps} />
-      ) : (
-        // ลองใช้ LineChart แทน AreaChart
-        <LineChart {...chartProps} />
-      )}
+      <div style={{ marginTop: "1rem" }}>
+        <h5>ข้อมูลเพศชาย (ตามช่วงอายุ)</h5>
+        {barChart ? <BarChart data={maleData} /> : <AreaChart data={maleData} />}
+      </div>
+      <div style={{ marginTop: "1rem" }}>
+        <h5>ข้อมูลเพศหญิง (ตามช่วงอายุ)</h5>
+        {barChart ? <BarChart data={femaleData} /> : <AreaChart data={femaleData} />}
+      </div>
     </Wrapper>
   );
 };
