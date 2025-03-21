@@ -39,11 +39,13 @@ const PatientSchema = new mongoose.Schema(
     createdBy: {
       type: mongoose.Types.ObjectId,
       ref: "User", // ผู้ใช้งานที่สร้างข้อมูลนี้
-    },updatedBy: { type: mongoose.Types.ObjectId, ref: "User" },
+    },
+    updatedBy: { type: mongoose.Types.ObjectId, ref: "User" },
     isDeleted: {
       type: Boolean,
       default: false, // ระบุว่าลบข้อมูลแล้วหรือไม่
-    },updatedAt: { type: Date, required: true },
+    },
+    updatedAt: { type: Date, required: true },
     deletedAt: {
       type: Date,
       default: null,
@@ -53,20 +55,31 @@ const PatientSchema = new mongoose.Schema(
         partialFilterExpression: { isDeleted: true },
       },
     },
-    // deletedAt: { type: Date, default: null },
-    // deleteExpiry: { type: Date, default: null },
     AdddataFirst: { type: Boolean, default: true },
     physicalTherapy: { type: Boolean, default: true },
+    // ฟิลด์ใหม่: เก็บประวัติการเปลี่ยนแปลงของ physicalTherapy
+    physicalTherapyHistory: [
+      {
+        changedAt: {
+          type: Date,
+          default: Date.now, // เวลาที่มีการเปลี่ยนแปลง
+        },
+        value: {
+          type: Boolean,    // เก็บค่า true หรือ false ในวันนั้น
+          required: true,
+        },
+      },
+    ],
     isEmailVerified: { type: Boolean, default: false },
 
     // ข้อมูลผู้ดูแล
-        // หากต้องการอ้างอิงข้อมูลผู้ดูแล (หากมีหลายคนสามารถใช้ Array ได้)
-        caregivers: [
-          {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "Caregiver",
-          },
-        ],
+    // หากต้องการอ้างอิงข้อมูลผู้ดูแล (หากมีหลายคนสามารถใช้ Array ได้)
+    caregivers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Caregiver",
+      },
+    ],
   },
   {
     collection: "User",

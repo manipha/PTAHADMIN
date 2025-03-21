@@ -52,7 +52,7 @@ const FormRowSelectWithCustom = ({ name, labelText, list, defaultValue = "", onC
         onChange={handleSelectChange}
         required={required}
       >
-        <option value="">โปรดเลือก</option>
+        <option value="">โปรดเลือกความสัมพันธ์กับผู้ป่วย</option>
         {list.map((itemValue) => (
           <option key={itemValue} value={itemValue}>
             {itemValue}

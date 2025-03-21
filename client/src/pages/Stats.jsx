@@ -14,7 +14,7 @@ export const loader = async () => {
 };
 
 const Stats = () => {
-  const { defaultStats, monthlyApplications, monthlyApplications2, genderAgeStats } = useLoaderData();
+  const { defaultStats, monthlyApplications, monthlyApplications2, genderAgeStats, genderAgeStatsPhysicalTherapy } = useLoaderData();
 
   return (
     <>
@@ -23,6 +23,13 @@ const Stats = () => {
         <ChartsContainer
           data={monthlyApplications}
           title="ข้อมูลคนไข้ที่ต้องทำกายภาพบำบัด"
+        />
+      )}
+
+      {genderAgeStatsPhysicalTherapy?.length > 1 && (
+        <ChartGenderAndAge
+          data={genderAgeStatsPhysicalTherapy}
+          title="ข้อมูลเพศและช่วงอายุคนไข้ที่ต้องทำกายภาพบำบัด"
         />
       )}
 

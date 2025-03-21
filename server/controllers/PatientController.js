@@ -194,37 +194,57 @@ export const updatePatient = async (req, res) => {
     console.log("📌 Update Request Params ID:", req.params._id);
     console.log("📌 Update Request Body:", req.body);
 
+    // Clone update data
     let updateData = { ...req.body };
 
-    // ✅ ตรวจสอบว่า TYPESTATUS ถูกใช้ได้ถูกต้อง
-    if (!TYPESTATUS) {
-      throw new Error("❌ TYPESTATUS is not defined");
-    }
-
-    // แปลง physicalTherapy ให้เป็น Boolean ถ้ามีการส่งค่ามา
+    // ถ้ามีการส่ง physicalTherapy มาเป็น string แปลงเป็น Boolean
     if (typeof updateData.physicalTherapy === "string") {
       updateData.physicalTherapy = updateData.physicalTherapy === "true";
     }
 
-    // ตรวจสอบถ้า userStatus เป็น "จบการรักษา" ให้ตั้ง physicalTherapy เป็น false
+    // กำหนด physicalTherapy ตาม userStatus ถ้าเป็น "จบการรักษา" ให้เป็น false
     if (updateData.userStatus === TYPESTATUS.TYPE_ST2) {
       updateData.physicalTherapy = false;
     }
+    // (ในกรณีที่เป็น "กำลังรักษาอยู่" ก็จะเป็น true ตามที่ส่งเข้ามา)
 
-    const updatedPatient = await Patient.findByIdAndUpdate(
-      req.params._id,
-      updateData,
-      { new: true, runValidators: true }
-    );
-
-    if (!updatedPatient) {
-      return res.status(404).json({ error: `ไม่พบผู้ป่วย ID: ${req.params._id}` });
+    // ดึงข้อมูลผู้ป่วยจาก DB โดยใช้ ID
+    const patient = await Patient.findById(req.params._id);
+    if (!patient) {
+      return res
+        .status(StatusCodes.NOT_FOUND)
+        .json({ error: `ไม่พบผู้ป่วย ID: ${req.params._id}` });
     }
 
-    res.status(200).json({ patient: updatedPatient });
+    // ตรวจสอบว่ามีการเปลี่ยนแปลงค่า physicalTherapy หรือไม่
+    if (
+      typeof updateData.physicalTherapy !== "undefined" &&
+      patient.physicalTherapy !== updateData.physicalTherapy
+    ) {
+      // บันทึก log การเปลี่ยนแปลงลงใน physicalTherapyHistory
+      patient.physicalTherapyHistory.push({
+        changedAt: new Date(), // หรือไม่ระบุก็ได้เพราะมี default: Date.now
+        value: updateData.physicalTherapy,
+      });
+      // อัปเดตฟิลด์ physicalTherapy
+      patient.physicalTherapy = updateData.physicalTherapy;
+    }
+
+    // อัปเดตฟิลด์อื่น ๆ ที่ส่งเข้ามา
+    for (const key in updateData) {
+      if (updateData.hasOwnProperty(key) && key !== "physicalTherapy") {
+        patient[key] = updateData[key];
+      }
+    }
+
+    const updatedPatient = await patient.save();
+    console.log("Updated patient:", updatedPatient);
+    res.status(StatusCodes.OK).json({ patient: updatedPatient });
   } catch (error) {
-    console.error("❌ Backend Error:", error);
-    res.status(500).json({ error: error.message || "เกิดข้อผิดพลาดในการอัปเดตข้อมูล" });
+    console.error("❌ Error updating patient:", error);
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      error: error.message || "เกิดข้อผิดพลาดในการอัปเดตข้อมูล",
+    });
   }
 };
 
@@ -264,7 +284,6 @@ export const showStats = async (req, res) => {
   }, {});
 
   const totalPatients = await Patient.countDocuments(); // นับจำนวนผู้ป่วยทั้งหมด
-
   const totalphysicalTherapyPatients = await Patient.countDocuments({
     physicalTherapy: true,
   });
@@ -310,10 +329,7 @@ export const showStats = async (req, res) => {
     { $match: { createdAt: { $exists: true } } },
     {
       $group: {
-        _id: {
-          year: { $year: "$createdAt" },
-          month: { $month: "$createdAt" },
-        },
+        _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
         count: { $sum: 1 },
       },
     },
@@ -337,51 +353,147 @@ export const showStats = async (req, res) => {
     })
     .reverse();
 
-  // Aggregation สำหรับข้อมูลเพศและช่วงอายุ (คำนวณจาก birthday)
+  // Aggregation สำหรับข้อมูลเพศและช่วงอายุ (คำนวณจาก birthday) สำหรับผู้ป่วยทั้งหมด
   let genderAgeStats = await Patient.aggregate([
-    // คำนวณอายุจากฟิลด์ birthday (แบบคำนวณเป็นปี)
+    // แปลง birthday ให้เป็น Date ด้วย $toDate
     {
       $addFields: {
-        age: { $subtract: [ { $year: new Date() }, { $year: "$birthday" } ] }
-      }
+        birthdayDate: { $toDate: "$birthday" },
+      },
     },
-    // แปลงอายุเป็นช่วง (เช่น 0-19, 20-39, 40-59, 60-79, 80+)
+    // คำนวณอายุจาก birthdayDate โดยใช้ $$NOW
+    {
+      $addFields: {
+        age: {
+          $dateDiff: {
+            startDate: "$birthdayDate",
+            endDate: "$$NOW",
+            unit: "year",
+          },
+        },
+      },
+    },
+    // แปลงอายุเป็นช่วงที่ชัดเจน
     {
       $addFields: {
         ageRange: {
           $switch: {
             branches: [
-              { case: { $lt: [ "$age", 20 ] }, then: "0-19" },
-              { case: { $lt: [ "$age", 40 ] }, then: "20-39" },
-              { case: { $lt: [ "$age", 60 ] }, then: "40-59" },
-              { case: { $lt: [ "$age", 80 ] }, then: "60-79" }
+              { case: { $lt: ["$age", 20] }, then: "0-19" },
+              {
+                case: {
+                  $and: [{ $gte: ["$age", 20] }, { $lt: ["$age", 40] }],
+                },
+                then: "20-39",
+              },
+              {
+                case: {
+                  $and: [{ $gte: ["$age", 40] }, { $lt: ["$age", 60] }],
+                },
+                then: "40-59",
+              },
+              {
+                case: {
+                  $and: [{ $gte: ["$age", 60] }, { $lt: ["$age", 80] }],
+                },
+                then: "60-79",
+              },
             ],
-            default: "80+"
-          }
-        }
-      }
+            default: "80+",
+          },
+        },
+      },
     },
-    // กลุ่มข้อมูลตามเพศและช่วงอายุ
+    // จัดกลุ่มข้อมูลตามเพศและช่วงอายุ
     {
       $group: {
         _id: { gender: "$gender", ageRange: "$ageRange" },
-        count: { $sum: 1 }
-      }
+        count: { $sum: 1 },
+      },
     },
-    // จัดรูปแบบผลลัพธ์ให้แสดงเฉพาะ gender, ageRange และ count
+    // จัดรูปแบบผลลัพธ์
     {
       $project: {
         gender: "$_id.gender",
         ageRange: "$_id.ageRange",
         count: 1,
-        _id: 0
-      }
+        _id: 0,
+      },
     },
-    {
-      $sort: { gender: 1, ageRange: 1 }
-    }
+    { $sort: { gender: 1, ageRange: 1 } },
   ]);
 
-  res.status(StatusCodes.OK).json({ defaultStats, monthlyApplications, monthlyApplications2, genderAgeStats });
-};
+  // Aggregation สำหรับข้อมูลเพศและช่วงอายุ เฉพาะผู้ป่วยที่ทำกายภาพบำบัด (physicalTherapy: true)
+  let genderAgeStatsPhysicalTherapy = await Patient.aggregate([
+    { $match: { physicalTherapy: true } },
+    {
+      $addFields: {
+        birthdayDate: { $toDate: "$birthday" },
+      },
+    },
+    {
+      $addFields: {
+        age: {
+          $dateDiff: {
+            startDate: "$birthdayDate",
+            endDate: "$$NOW",
+            unit: "year",
+          },
+        },
+      },
+    },
+    {
+      $addFields: {
+        ageRange: {
+          $switch: {
+            branches: [
+              { case: { $lt: ["$age", 20] }, then: "0-19" },
+              {
+                case: {
+                  $and: [{ $gte: ["$age", 20] }, { $lt: ["$age", 40] }],
+                },
+                then: "20-39",
+              },
+              {
+                case: {
+                  $and: [{ $gte: ["$age", 40] }, { $lt: ["$age", 60] }],
+                },
+                then: "40-59",
+              },
+              {
+                case: {
+                  $and: [{ $gte: ["$age", 60] }, { $lt: ["$age", 80] }],
+                },
+                then: "60-79",
+              },
+            ],
+            default: "80+",
+          },
+        },
+      },
+    },
+    {
+      $group: {
+        _id: { gender: "$gender", ageRange: "$ageRange" },
+        count: { $sum: 1 },
+      },
+    },
+    {
+      $project: {
+        gender: "$_id.gender",
+        ageRange: "$_id.ageRange",
+        count: 1,
+        _id: 0,
+      },
+    },
+    { $sort: { gender: 1, ageRange: 1 } },
+  ]);
 
+  res.status(StatusCodes.OK).json({
+    defaultStats,
+    monthlyApplications,
+    monthlyApplications2,
+    genderAgeStats,
+    genderAgeStatsPhysicalTherapy,
+  });
+};

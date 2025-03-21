@@ -14,21 +14,26 @@ import { toast } from "react-toastify";
 export const action = async ({ request }) => {
   const formData = await request.formData();
   const data = Object.fromEntries(formData);
-  const errors = { msg: "" };
-  if (data.password.length < 1) {
-    errors.msg = "password too short";
-    return errors;
+  
+  // ตรวจสอบความยาวของ password
+  if (!data.password || data.password.length < 1) {
+    return { msg: "Password too short" };
   }
+  
   try {
+    // ส่งข้อมูลไปที่ API เพื่อทำการ login
     await customFetch.post("/auth/login", data);
     toast.success("เข้าสู่ระบบเรียบร้อยแล้ว");
     return redirect("/dashboard");
   } catch (error) {
-    // toast.error(error?.response?.data?.msg);
-    errors.msg = error.response.data.msg;
-    return errors;
+    // ดึงข้อความ error จาก response หากมี หรือใช้ข้อความเริ่มต้น
+    const errorMsg =
+      error?.response?.data?.msg || "เกิดข้อผิดพลาดในการเข้าสู่ระบบ";
+    toast.error(errorMsg);
+    return { msg: errorMsg };
   }
 };
+
 
 const Login = () => {
   const errors = useActionData();
